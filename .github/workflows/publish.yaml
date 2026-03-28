@@ -1,0 +1,26 @@
+name: Publish
+
+on:
+  push:
+    tags:
+      - v*
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: astral-sh/setup-uv@v6
+        with:
+          version: "0.8.22"
+      - run: |
+          version=$(echo ${{ github.ref }} | grep -oP '(?<=refs/tags/v).*')
+          echo "version=$version" >> "$GITHUB_ENV"
+      - run: echo $version
+      - name: Set version in pyproject.yaml
+        run: |
+          uvx --from=toml-cli@0.8.2 toml set \
+            --toml-path=pyproject.toml project.version $version
+      - run: uv build
+      - run: uv publish
+        env:
+          UV_PUBLISH_TOKEN: ${{ secrets.UV_PUBLISH_TOKEN }}
