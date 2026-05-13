@@ -1,28 +1,48 @@
-# Percival Notes MCP
-MCP server for collaborative note management using Markdown + YAML frontmatter, with security hardening and nanobot-focused integration.
+# 🤖 Percival Notes - percival.OS MCP
 
-## Original Project
-This project is based on the original **notes-mcp** by Edvard Lindelof:
-- Original repository: https://github.com/edvardlindelof/notes-mcp
+**Version 0.0.2**
 
-`percival-notes-mcp` keeps the original idea and tool model, while adding production-oriented hardening and better agent interoperability.
+[![Python](https://img.shields.io/badge/python-3.10+-yellow.svg)]()
+[![MCP](https://img.shields.io/badge/mcp-server-blue.svg)]()
+[![percival.OS](https://img.shields.io/badge/percival.OS-ecosystem-orange.svg)](https://github.com/bill-kopp-ai-dev/percival.OS)
 
-## What Was Improved
-- Full refactor to standardized stack: `uv`, `pyproject.toml`, `mcp.server.fastmcp` (FastMCP via MCP SDK).
-- Safer filesystem handling with strict root containment (path traversal blocking).
-- Explicit untrusted-data envelope in `read` output to reduce prompt-injection risk.
-- Logical limits and timeouts for `read`, `write`, `glob`, and `search`.
-- Stronger tool documentation (docstrings) to improve function-calling behavior in AI agents.
-- Security-focused test coverage for traversal, payload limits, scan/match limits, and timeout behavior.
+## 📋 Description
+MCP server for collaborative note management using Markdown + YAML frontmatter, with security hardening and deep integration with the Nanobot agent.
 
-## Nanobot Optimization (Highlight)
-This server was optimized to be reliable with **nanobot**:
-- Tool signatures and docstrings are tuned for consistent tool selection and argument formatting.
-- `search` accepts both `list[str]` and delimited `string` queries, improving robustness against LLM argument variability.
-- Outputs are stable and relative-path based, reducing noisy context and token waste.
-- `enabledTools` and `toolTimeout` usage is documented for predictable runtime control.
+This server is part of the **percival.OS** ecosystem, a Personal Agentic Operating System designed for autonomy, security, and absolute privacy.
 
-Nanobot config example (`~/.nanobot/config.json`):
+---
+
+## 🛡️ percival.OS Principles
+Like all components of `percival.OS`, this MCP server strictly follows our core principles:
+
+- **Privacy First**: All note processing is performed locally. Your notes never leave your infrastructure.
+- **Data Sovereignty**: You have absolute control over where your notes are stored and how they are accessed.
+- **Hardened Security**: Strict root containment (path traversal blocking) and untrusted-data envelope marking to mitigate prompt-injection risks.
+- **Transparency**: Open-source and auditable to ensure full governance of your data.
+
+---
+
+## 🚀 Features & Tools
+The `percival-notes-mcp` offers advanced knowledge management capabilities:
+
+- `notes_read(path)`: Read a single note.
+- `notes_write(path, yaml_frontmatter, markdown_content)`: Create or update a note.
+- `notes_glob(pattern)`: List files matching a pattern.
+- `notes_mkdir(path)`: Create a directory.
+- `notes_rm(path)`: Remove a file.
+- `notes_rmdir(path)`: Remove a directory.
+- `notes_search(query, path=".", in_markdown=false)`: Search in frontmatter or content.
+- `notes_list_tags()`: List all unique tags across notes.
+- `notes_get_backlinks(path)`: Find notes linking to a specific note.
+- `notes_read_multiple(paths)`: Read multiple notes in a single call.
+- `notes_get_stats()`: Get repository overview (totals, top tags, etc).
+- `notes_get_status()`: Check server operational status.
+
+---
+
+## ⚙️ Configuration in percival.OS (Nanobot)
+Add the following configuration to your `~/.nanobot/config.json`:
 
 ```json
 {
@@ -35,9 +55,9 @@ Nanobot config example (`~/.nanobot/config.json`):
           "--directory",
           "/path/to/percival-notes-mcp",
           "percival-notes-mcp",
-          "/path/to/my-notes"
+          "/path/to/your-notes"
         ],
-        "enabledTools": ["read", "write", "glob", "mkdir", "rm", "rmdir", "search"],
+        "enabledTools": ["notes_read", "notes_write", "notes_glob", "notes_mkdir", "notes_rm", "notes_rmdir", "notes_search"],
         "toolTimeout": 30
       }
     }
@@ -45,50 +65,26 @@ Nanobot config example (`~/.nanobot/config.json`):
 }
 ```
 
-## Tools
-- `read(path)`
-- `write(path, yaml_frontmatter, markdown_content)`
-- `glob(pattern)`
-- `mkdir(path)`
-- `rm(path)`
-- `rmdir(path)`
-- `search(query, path=".", in_markdown=false)`
+---
 
-## Security Model
-- Root directory sandboxing for every file operation.
-- Prompt-injection mitigation by marking note payloads as **untrusted data**.
-- Configurable guardrails for size/volume/time to prevent oversized or expensive operations.
+## 🛠️ Development & Testing
+This project uses `uv` for dependency management.
 
-Environment variables:
-- `PERCIVAL_NOTES_MCP_MAX_READ_BYTES` (default: `1000000`)
-- `PERCIVAL_NOTES_MCP_MAX_WRITE_BYTES` (default: `1000000`)
-- `PERCIVAL_NOTES_MCP_MAX_SEARCH_FILE_BYTES` (default: `1000000`)
-- `PERCIVAL_NOTES_MCP_MAX_GLOB_RESULTS` (default: `2000`)
-- `PERCIVAL_NOTES_MCP_MAX_SEARCH_FILES` (default: `5000`)
-- `PERCIVAL_NOTES_MCP_MAX_SEARCH_MATCHES` (default: `1000`)
-- `PERCIVAL_NOTES_MCP_OPERATION_TIMEOUT_SECONDS` (default: `20`)
-
-Legacy `NOTES_MCP_*` env vars are still accepted for backward compatibility.
-
-## Quick Start (Claude Desktop)
-Add to `claude_desktop_config.json`:
-
-```json
-{
-  "mcpServers": {
-    "percival-notes": {
-      "command": "uvx",
-      "args": ["percival-notes-mcp", "C:\\Users\\me\\path\\to\\my-notes"]
-    }
-  }
-}
-```
-
-## Local Development
 ```bash
+# Run tests
 uv run --directory /path/to/percival-notes-mcp pytest -q
+
+# Run locally
 uv run --directory /path/to/percival-notes-mcp percival-notes-mcp /path/to/my-notes
 ```
 
-## License
-MIT (same as original project).
+---
+
+## 📚 About the Project
+This server is an integral module of the **percival.OS** project. It is an evolution of the original `notes-mcp` by Edvard Lindelof, optimized for the Percival ecosystem.
+
+- **Main Repository**: [https://github.com/bill-kopp-ai-dev/percival.OS](https://github.com/bill-kopp-ai-dev/percival.OS)
+- **License**: MIT
+
+---
+*Developed with ❤️ by the percival.OS Team*

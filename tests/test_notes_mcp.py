@@ -14,16 +14,18 @@ def test_normalize_query_accepts_list_and_deduplicates() -> None:
 
 
 def test_split_frontmatter_falls_back_for_plain_markdown() -> None:
-    yaml_part, markdown_part = notes_mcp._split_frontmatter("plain markdown")
+    yaml_part, markdown_part, yaml_dict = notes_mcp._split_frontmatter("plain markdown")
     assert yaml_part == ""
     assert markdown_part == "plain markdown"
+    assert yaml_dict == {}
 
 
 def test_split_frontmatter_extracts_yaml_and_markdown() -> None:
     content = "---\ntitle: Test\n---\nBody"
-    yaml_part, markdown_part = notes_mcp._split_frontmatter(content)
+    yaml_part, markdown_part, yaml_dict = notes_mcp._split_frontmatter(content)
     assert "title: test" in yaml_part.lower()
     assert markdown_part.strip() == "Body"
+    assert yaml_dict == {"title": "Test"}
 
 
 def test_resolve_safe_path_blocks_traversal(tmp_path: Path) -> None:

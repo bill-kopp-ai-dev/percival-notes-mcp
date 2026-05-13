@@ -220,13 +220,58 @@ def _to_relative(root_dir: Path, path: Path) -> str:
     return str(path.relative_to(root_dir)).replace("\\", "/")
 
 
-def _split_frontmatter(content: str) -> tuple[str, str]:
-    """Return (yaml_part, markdown_part) with fallback for plain markdown files."""
+def _split_frontmatter(content: str) -> tuple[str, str, dict]:
+    """Return (yaml_raw, markdown_part, parsed_yaml) with fallback for plain markdown files."""
     if content.startswith("---"):
         parts = content.split("---", 2)
         if len(parts) == 3:
-            return parts[1], parts[2]
-    return "", content
+            try:
+                parsed = yaml.safe_load(parts[1])
+                if not isinstance(parsed, dict):
+                    parsed = {}
+                return parts[1], parts[2], parsed
+            except Exception:
+                return parts[1], parts[2], {}
+    return "", content, {}
+
+
+def _extract_tags(yaml_dict: dict) -> list[str]:
+    """Extract unique tags from YAML dictionary (fields 'tags' or 'keywords')."""
+    raw_tags = yaml_dict.get("tags") or yaml_dict.get("keywords") or []
+    if isinstance(raw_tags, str):
+        raw_tags = [t.strip() for t in re.split(r"[,;]", raw_tags)]
+    elif not isinstance(raw_tags, list):
+        raw_tags = []
+
+    tags = set()
+    for t in raw_tags:
+        if isinstance(t, str):
+            val = t.strip().lower()
+            if val:
+                tags.add(val)
+    return sorted(list(tags))
+
+
+def _extract_links(markdown_content: str) -> list[str]:
+    """Extract wiki-style links [[Note Name]] and standard markdown links."""
+    links = set()
+    # Wiki links: [[Link]] or [[Link|Alias]]
+    wiki_pattern = r"\[\[(.*?)\]\]"
+    for match in re.finditer(wiki_pattern, markdown_content):
+        link_content = match.group(1).split("|")[0].strip()
+        if link_content:
+            links.add(link_content)
+
+    # Standard markdown links: [Text](Link)
+    md_pattern = r"\[.*?\]\((.*?)\)"
+    for match in re.finditer(md_pattern, markdown_content):
+        link = match.group(1).strip()
+        if link and not link.startswith(("http://", "https://", "mailto:", "tel:")):
+            # Only include local-ish links (ending in .md or without extension)
+            if link.endswith(".md") or "." not in link:
+                links.add(link)
+
+    return sorted(list(links))
 
 
 def _collect_safe_matches(
@@ -305,7 +350,7 @@ def _search_notes(
             )
             continue
 
-        yaml_part, md_part = _split_frontmatter(content)
+        yaml_part, md_part, yaml_dict = _split_frontmatter(content)
         if any(q in yaml_part for q in normalized_query) or (
             in_markdown and any(q in md_part for q in normalized_query)
         ):
@@ -327,7 +372,7 @@ def create_mcp(root_dir: Path) -> FastMCP:
     logger.info("Runtime limits=%s", limits)
     mcp = FastMCP(SERVER_NAME)
 
-    @mcp.tool()
+    @mcp.tool(name="notes_read")
     def read(path: str) -> str:
         """Read one note file and return its raw content as untrusted data.
 
@@ -354,7 +399,7 @@ def create_mcp(root_dir: Path) -> FastMCP:
         )
         return _mark_untrusted_note_content(content, source=relative)
 
-    @mcp.tool()
+    @mcp.tool(name="notes_write")
     def write(path: str, yaml_frontmatter: str, markdown_content: str) -> str:
         """Create or replace a markdown note using YAML frontmatter + markdown body.
 
@@ -387,7 +432,7 @@ def create_mcp(root_dir: Path) -> FastMCP:
         logger.info("write path=%s", _escape_inline_text(relative))
         return f"File written: {_escape_inline_text(relative)}"
 
-    @mcp.tool()
+    @mcp.tool(name="notes_glob")
     def glob(pattern: str) -> list[str]:
         """List note paths matching a glob pattern.
 
@@ -415,7 +460,7 @@ def create_mcp(root_dir: Path) -> FastMCP:
         logger.info("glob pattern=%r matches=%d", pattern, len(matches))
         return matches
 
-    @mcp.tool()
+    @mcp.tool(name="notes_mkdir")
     def mkdir(path: str) -> str:
         """Create a directory (and parents) inside the notes root.
 
@@ -435,7 +480,7 @@ def create_mcp(root_dir: Path) -> FastMCP:
         logger.info("mkdir path=%s", _escape_inline_text(relative))
         return f"Directory created: {_escape_inline_text(relative)}"
 
-    @mcp.tool()
+    @mcp.tool(name="notes_rm")
     def rm(path: str) -> str:
         """Remove a file inside the notes root.
 
@@ -456,7 +501,7 @@ def create_mcp(root_dir: Path) -> FastMCP:
         logger.info("rm path=%s", _escape_inline_text(relative))
         return f"File removed: {_escape_inline_text(relative)}"
 
-    @mcp.tool()
+    @mcp.tool(name="notes_rmdir")
     def rmdir(path: str) -> str:
         """Remove an existing directory inside the notes root.
 
@@ -479,7 +524,7 @@ def create_mcp(root_dir: Path) -> FastMCP:
         logger.info("rmdir path=%s", _escape_inline_text(relative))
         return f"Directory removed: {_escape_inline_text(relative)}"
 
-    @mcp.tool()
+    @mcp.tool(name="notes_search")
     def search(
         query: str | list[str],
         path: str = ".",
@@ -524,6 +569,179 @@ def create_mcp(root_dir: Path) -> FastMCP:
             len(deduped),
         )
         return deduped
+
+    @mcp.tool(name="notes_list_tags")
+    def list_tags() -> list[str]:
+        """List all unique tags found across all notes.
+
+        Returns:
+            A sorted list of unique tags (lower-cased).
+
+        Notes:
+            - Scans YAML frontmatter fields 'tags' and 'keywords'.
+            - Only .md files are scanned.
+        """
+        all_tags = set()
+        started_at = time.monotonic()
+        scanned_files = 0
+
+        for note_path in root_dir.rglob("*.md"):
+            _ensure_not_timed_out(started_at, limits.operation_timeout_seconds, "list_tags")
+            if not note_path.is_file():
+                continue
+
+            scanned_files += 1
+            try:
+                # We only need the frontmatter, so we could potentially read just the start of the file
+                # but for simplicity and safety (limits), we use our helper.
+                content = _read_text_with_limit(
+                    note_path, limits.max_read_bytes, "list_tags scanning"
+                )
+                _, _, yaml_dict = _split_frontmatter(content)
+                all_tags.update(_extract_tags(yaml_dict))
+            except Exception:
+                continue
+
+        logger.info("list_tags scanned %d files, found %d tags", scanned_files, len(all_tags))
+        return sorted(list(all_tags))
+
+    @mcp.tool(name="notes_get_backlinks")
+    def get_backlinks(path: str) -> list[str]:
+        """Find all notes that link to the specified note.
+
+        Args:
+            path: Relative path or name of the target note (e.g. "Project A" or "projects/a.md").
+
+        Returns:
+            Sorted list of relative paths of notes that link to the target.
+
+        Notes:
+            - Supports [[Wiki Links]] and standard [Markdown](links).
+            - Matches by filename (with or without .md) or full relative path.
+        """
+        target_name = Path(path).stem.lower()
+        target_full = path.lower()
+        if not target_full.endswith(".md"):
+            target_full += ".md"
+
+        backlinks = set()
+        started_at = time.monotonic()
+        scanned_files = 0
+
+        for note_path in root_dir.rglob("*.md"):
+            _ensure_not_timed_out(started_at, limits.operation_timeout_seconds, "get_backlinks")
+            if not note_path.is_file():
+                continue
+
+            scanned_files += 1
+            relative_path = _to_relative(root_dir, note_path)
+            if relative_path.lower() == target_full:
+                continue  # Skip the note itself
+
+            try:
+                content = _read_text_with_limit(
+                    note_path, limits.max_read_bytes, "get_backlinks scanning"
+                )
+                _, md_part, _ = _split_frontmatter(content)
+                links = _extract_links(md_part)
+
+                for link in links:
+                    link_low = link.lower()
+                    # Match if link is exactly the name, or the full path
+                    if link_low == target_name or link_low == target_full or link_low.endswith("/" + target_full):
+                        backlinks.add(relative_path)
+                        break
+            except Exception:
+                continue
+
+        logger.info("get_backlinks for %r found %d results", path, len(backlinks))
+        return sorted(list(backlinks))
+
+    @mcp.tool(name="notes_read_multiple")
+    def read_multiple(paths: list[str]) -> dict[str, str]:
+        """Read multiple notes in a single call.
+
+        Args:
+            paths: List of relative paths to markdown notes.
+
+        Returns:
+            A dictionary mapping each path to its content (wrapped in untrusted envelopes).
+
+        Notes:
+            - Paths that don't exist or are outside root are skipped.
+            - Total operation is subject to standard timeouts.
+        """
+        results = {}
+        started_at = time.monotonic()
+
+        for path in paths:
+            _ensure_not_timed_out(started_at, limits.operation_timeout_seconds, "read_multiple")
+            try:
+                target = _resolve_safe_path(root_dir, path, must_exist=True, expect_dir=False)
+                relative = _to_relative(root_dir, target)
+                content = _read_text_with_limit(
+                    target, limits.max_read_bytes, f"read_multiple file {relative!r}"
+                )
+                results[relative] = _mark_untrusted_note_content(content, source=relative)
+            except Exception as e:
+                logger.warning("read_multiple failed for %r: %s", path, e)
+                continue
+
+        logger.info("read_multiple requested %d, found %d", len(paths), len(results))
+        return results
+
+    @mcp.tool(name="notes_get_stats")
+    def get_stats() -> dict:
+        """Get overview statistics of the notes repository.
+
+        Returns:
+            A dictionary with:
+            - total_notes: Count of .md files.
+            - total_tags: Count of unique tags.
+            - most_used_tags: Top 5 tags by frequency.
+            - last_modified_note: Path of the most recently changed note.
+        """
+        total_notes = 0
+        tag_counts = {}
+        last_mod_time = 0
+        last_mod_path = ""
+        started_at = time.monotonic()
+
+        for note_path in root_dir.rglob("*.md"):
+            _ensure_not_timed_out(started_at, limits.operation_timeout_seconds, "get_stats")
+            if not note_path.is_file():
+                continue
+
+            total_notes += 1
+            mtime = note_path.stat().st_mtime
+            if mtime > last_mod_time:
+                last_mod_time = mtime
+                last_mod_path = _to_relative(root_dir, note_path)
+
+            try:
+                content = _read_text_with_limit(
+                    note_path, limits.max_read_bytes, "get_stats scanning"
+                )
+                _, _, yaml_dict = _split_frontmatter(content)
+                tags = _extract_tags(yaml_dict)
+                for t in tags:
+                    tag_counts[t] = tag_counts.get(t, 0) + 1
+            except Exception:
+                continue
+
+        sorted_tags = sorted(tag_counts.items(), key=lambda x: x[1], reverse=True)
+
+        return {
+            "total_notes": total_notes,
+            "total_tags": len(tag_counts),
+            "most_used_tags": dict(sorted_tags[:5]),
+            "last_modified_note": last_mod_path
+        }
+
+    @mcp.tool(name="notes_get_status")
+    def get_status() -> str:
+        """Get the operational status of the notes server."""
+        return f"Percival Notes MCP Server operational. Root: {root_dir}"
 
     return mcp
 
