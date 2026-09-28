@@ -1,7 +1,7 @@
 [project]
 name = "percival-notes-mcp"
 version = "0.1.5"
-description = "Percival MCP server for managing markdown notes with YAML frontmatter"
+description = "Percival MCP server for OKF v0.2 markdown notes and ripgrep search"
 authors = [
     {name = "Edvard Lindelöf", email = "edvardlindelof@gmail.com"},
 ]

@@ -64,14 +64,14 @@ def _extract_tool_result(result):
 @pytest.mark.asyncio
 async def test_list_tags(notes_dir):
     mcp = create_mcp(notes_dir)
-    result = await mcp.call_tool("list_tags", {})
+    result = await mcp.call_tool("notes_list_tags", {})
     tags = _extract_tool_result(result)
     assert tags == ["personal", "work"]
 
 @pytest.mark.asyncio
 async def test_get_backlinks(notes_dir):
     mcp = create_mcp(notes_dir)
-    result = await mcp.call_tool("get_backlinks", {"path": "note1.md"})
+    result = await mcp.call_tool("notes_get_backlinks", {"path": "note1.md"})
     backlinks = _extract_tool_result(result)
     assert "note2.md" in backlinks
     assert "note3.md" in backlinks
@@ -80,7 +80,7 @@ async def test_get_backlinks(notes_dir):
 @pytest.mark.asyncio
 async def test_read_multiple(notes_dir):
     mcp = create_mcp(notes_dir)
-    result = await mcp.call_tool("read_multiple", {"paths": ["note1.md", "note2.md"]})
+    result = await mcp.call_tool("notes_read_multiple", {"paths": ["note1.md", "note2.md"]})
     results = _extract_tool_result(result)
     assert len(results) == 2
     assert "note1.md" in results
@@ -89,7 +89,7 @@ async def test_read_multiple(notes_dir):
 @pytest.mark.asyncio
 async def test_get_stats(notes_dir):
     mcp = create_mcp(notes_dir)
-    result = await mcp.call_tool("get_stats", {})
+    result = await mcp.call_tool("notes_get_stats", {})
     stats = _extract_tool_result(result)
     assert stats["total_notes"] == 3
     assert stats["total_tags"] == 2

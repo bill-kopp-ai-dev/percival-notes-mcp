@@ -18,3 +18,9 @@ htmlcov/
 .vscode/
 .idea/
 .DS_Store
+
+# Internal planning notes (working drafts, not for distribution)
+docs/plans/
+
+# Local Positronic project state and operator-specific instructions
+.positronic/

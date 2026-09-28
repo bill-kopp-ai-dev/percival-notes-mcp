@@ -1,8 +1,16 @@
 import argparse
 import logging
+import math
 import os
+import posixpath
 import re
+import secrets
+import select
+import shutil
+import stat
+import subprocess
 import time
+from contextlib import ExitStack, contextmanager
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Iterable
@@ -45,7 +53,7 @@ class RuntimeLimits:
 
 def _parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description="Percival YAML frontmatter markdown notes MCP server"
+        description="Percival OKF v0.2 markdown notes MCP server"
     )
     parser.add_argument("root_dir", help="Root directory for notes")
     return parser.parse_args()
@@ -92,6 +100,9 @@ def _get_env_float(
     try:
         value = float(raw)
     except ValueError:
+        logger.warning("Invalid %s=%r, using default=%s", name, raw, default)
+        return default
+    if not math.isfinite(value):
         logger.warning("Invalid %s=%r, using default=%s", name, raw, default)
         return default
     if value < minimum:
@@ -209,11 +220,31 @@ def _assert_text_size_within_limit(text: str, max_bytes: int, subject: str) -> i
     return size
 
 
-def _read_text_with_limit(path: Path, max_bytes: int, subject: str) -> str:
-    size = path.stat().st_size
-    if size > max_bytes:
-        raise ValueError(f"{subject} exceeds limit ({size} > {max_bytes} bytes).")
-    return path.read_text(encoding="utf-8")
+def _read_bytes_with_limit(path: Path, max_bytes: int, subject: str,
+                           *, root_dir: Path | None = None) -> bytes:
+    if root_dir is None:
+        with path.open("rb") as stream:
+            content = stream.read(max_bytes + 1)
+    else:
+        with _open_contained_directory(root_dir, path.parent) as parent_fd:
+            fd = os.open(path.name, os.O_RDONLY | os.O_NOFOLLOW, dir_fd=parent_fd)
+            with os.fdopen(fd, "rb") as stream:
+                content = stream.read(max_bytes + 1)
+    if len(content) > max_bytes:
+        raise ValueError(f"{subject} exceeds limit ({len(content)} > {max_bytes} bytes).")
+    return content
+
+
+def _read_text_with_limit(path: Path, max_bytes: int, subject: str,
+                          *, root_dir: Path | None = None) -> str:
+    content = _read_bytes_with_limit(path, max_bytes, subject, root_dir=root_dir)
+    # Match Path.read_text's universal-newline behavior while bounding the read.
+    return content.decode("utf-8").replace("\r\n", "\n").replace("\r", "\n")
+
+
+def _stat_contained_file(root_dir: Path, path: Path) -> os.stat_result:
+    with _open_contained_directory(root_dir, path.parent) as parent_fd:
+        return os.stat(path.name, dir_fd=parent_fd, follow_symlinks=False)
 
 
 def _to_relative(root_dir: Path, path: Path) -> str:
@@ -222,17 +253,34 @@ def _to_relative(root_dir: Path, path: Path) -> str:
 
 def _split_frontmatter(content: str) -> tuple[str, str, dict]:
     """Return (yaml_raw, markdown_part, parsed_yaml) with fallback for plain markdown files."""
-    if content.startswith("---"):
-        parts = content.split("---", 2)
-        if len(parts) == 3:
-            try:
-                parsed = yaml.safe_load(parts[1])
-                if not isinstance(parsed, dict):
-                    parsed = {}
-                return parts[1], parts[2], parsed
-            except Exception:
-                return parts[1], parts[2], {}
+    match = re.match(r"\A---\r?\n(.*?)\r?\n---(?=\r?\n|\Z)", content, re.DOTALL)
+    if match:
+        raw = "\n" + match.group(1) + "\n"
+        try:
+            parsed = yaml.safe_load(raw)
+            if not isinstance(parsed, dict):
+                parsed = {}
+            return raw, content[match.end():], parsed
+        except yaml.YAMLError:
+            return raw, content[match.end():], {}
     return "", content, {}
+
+
+def _validate_okf_frontmatter(frontmatter: str, *, root_index: bool = False) -> None:
+    match = re.fullmatch(r"---\r?\n(.*?)\r?\n---", frontmatter, re.DOTALL)
+    if not match:
+        raise ValueError("YAML frontmatter must have --- delimiters on their own lines")
+    try:
+        metadata = yaml.safe_load(match.group(1))
+    except yaml.YAMLError as exc:
+        raise ValueError("Invalid YAML frontmatter") from exc
+    if not isinstance(metadata, dict):
+        raise ValueError("OKF frontmatter must be a YAML mapping")
+    if root_index:
+        if metadata != {"okf_version": "0.2"}:
+            raise ValueError('Root index.md frontmatter must contain only okf_version: "0.2"')
+    elif not isinstance(metadata.get("type"), str) or not metadata["type"].strip():
+        raise ValueError("OKF concept requires a non-empty string type")
 
 
 def _extract_tags(yaml_dict: dict) -> list[str]:
@@ -274,6 +322,33 @@ def _extract_links(markdown_content: str) -> list[str]:
     return sorted(list(links))
 
 
+def _links_to_target(body: str, source: str, target: str, target_name: str) -> bool:
+    """Resolve OKF Markdown paths; keep legacy wiki-name matching separately."""
+    for wiki in re.findall(r"\[\[(.*?)\]\]", body):
+        name = wiki.split("|", 1)[0].strip().lower()
+        if name in (target_name, target):
+            return True
+        if "/" not in target and name.endswith("/" + target):
+            return True
+    for link in re.findall(r"\[.*?\]\((.*?)\)", body):
+        link = link.strip()
+        if link.startswith(("http://", "https://", "mailto:", "tel:")):
+            continue
+        resolved = posixpath.normpath(posixpath.join(
+            "" if link.startswith("/") else posixpath.dirname(source), link.lstrip("/")))
+        if resolved.startswith("../") or resolved == "..":
+            continue
+        if resolved.lower() == target or (not posixpath.splitext(resolved)[1] and
+                                          resolved.lower() + ".md" == target):
+            return True
+        # Preserve legacy matching by bare filename for simple links.
+        if "/" not in target and "/" not in link and link.lower() in (
+            target_name, posixpath.basename(target)
+        ):
+            return True
+    return False
+
+
 def _collect_safe_matches(
     root_dir: Path,
     paths: Iterable[Path],
@@ -297,6 +372,74 @@ def _collect_safe_matches(
                 "narrow the request."
             )
     return sorted(matches)
+
+
+def _contained_note(root_dir: Path, path: Path) -> Path | None:
+    resolved = path.resolve(strict=False)
+    if resolved != root_dir and root_dir not in resolved.parents:
+        logger.warning("Skipping note outside notes root")
+        return None
+    return resolved
+
+
+@contextmanager
+def _open_contained_directory(root_dir: Path, parent: Path):
+    """Anchor a canonical parent at the vault and refuse swapped symlinks."""
+    fd = os.open(root_dir, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW)
+    try:
+        for part in parent.relative_to(root_dir).parts:
+            next_fd = os.open(part, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW,
+                              dir_fd=fd)
+            os.close(fd)
+            fd = next_fd
+        yield fd
+    finally:
+        os.close(fd)
+
+
+def _mkdir_contained(root_dir: Path, target: Path) -> None:
+    fd = os.open(root_dir, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW)
+    try:
+        for part in target.relative_to(root_dir).parts:
+            try:
+                os.mkdir(part, dir_fd=fd)
+            except FileExistsError:
+                pass
+            next_fd = os.open(part, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW,
+                              dir_fd=fd)
+            os.close(fd)
+            fd = next_fd
+    finally:
+        os.close(fd)
+
+
+def _atomic_write(root_dir: Path, target: Path, payload: str) -> None:
+    # The final replace is relative to the same anchored directory descriptor
+    # as the temporary file, so a symlink swap cannot redirect it elsewhere.
+    with _open_contained_directory(root_dir, target.parent) as parent_fd:
+        name = ".notes-" + secrets.token_hex(16)
+        temp_fd = os.open(name, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW,
+                          0o600, dir_fd=parent_fd)
+        try:
+            with os.fdopen(temp_fd, "w", encoding="utf-8") as stream:
+                try:
+                    existing = os.stat(target.name, dir_fd=parent_fd, follow_symlinks=False)
+                except FileNotFoundError:
+                    pass
+                else:
+                    if not stat.S_ISREG(existing.st_mode):
+                        raise ValueError("Write target is no longer a regular file")
+                    os.fchmod(stream.fileno(), stat.S_IMODE(existing.st_mode))
+                stream.write(payload)
+                stream.flush()
+                os.fsync(stream.fileno())
+            os.replace(name, target.name, src_dir_fd=parent_fd, dst_dir_fd=parent_fd)
+            os.fsync(parent_fd)
+        finally:
+            try:
+                os.unlink(name, dir_fd=parent_fd)
+            except FileNotFoundError:
+                pass
 
 
 def _mark_untrusted_note_content(content: str, source: str) -> str:
@@ -342,6 +485,7 @@ def _search_notes(
                 safe_note_path,
                 limits.max_search_file_bytes,
                 f"search input file {relative_path!r}",
+                root_dir=root_dir,
             ).lower()
         except ValueError:
             logger.warning(
@@ -361,6 +505,160 @@ def _search_notes(
                     f"({len(matches)} > {limits.max_search_matches}); narrow query."
                 )
 
+    return sorted(matches)
+
+
+def _rg_matches(rg: str, files: list[Path], terms: list[str], deadline: float,
+                output_limit: int, *, root_dir: Path | None = None,
+                max_file_bytes: int | None = None) -> set[str]:
+    """Run rg over explicit, contained files; bound wall time and output memory."""
+    argv = [rg, "--no-config", "--no-ignore", "--hidden", "-a", "-F", "-i", "-l", "-0"]
+    if max_file_bytes is not None:
+        argv.extend(["--max-filesize", str(max_file_bytes)])
+    for term in terms:
+        argv.extend(["-e", term])
+    with ExitStack() as stack:
+        paths: dict[str, str] = {}
+        pass_fds: list[int] = []
+        for path in files:
+            if time.monotonic() >= deadline:
+                raise TimeoutError("search exceeded timeout; narrow the request.")
+            if root_dir is None:
+                input_path = str(path)
+            else:
+                with _open_contained_directory(root_dir, path.parent) as parent_fd:
+                    fd = os.open(path.name, os.O_RDONLY | os.O_NOFOLLOW, dir_fd=parent_fd)
+                stack.callback(os.close, fd)
+                pass_fds.append(fd)
+                input_path = f"/proc/self/fd/{fd}"
+            paths[input_path] = str(path)
+        argv.extend(["--", *paths])
+        proc = subprocess.Popen(argv, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE,
+                                stderr=subprocess.DEVNULL, pass_fds=tuple(pass_fds))
+        output = bytearray()
+        try:
+            assert proc.stdout is not None
+            while True:
+                remaining = deadline - time.monotonic()
+                if remaining <= 0:
+                    raise TimeoutError("search exceeded timeout; narrow the request.")
+                readable, _, _ = select.select([proc.stdout], [], [], remaining)
+                if not readable:
+                    raise TimeoutError("search exceeded timeout; narrow the request.")
+                chunk = os.read(proc.stdout.fileno(), 65536)
+                if not chunk:
+                    break
+                output.extend(chunk)
+                if len(output) > output_limit:
+                    raise ValueError("search exceeded ripgrep output limit; narrow the request.")
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                raise TimeoutError("search exceeded timeout; narrow the request.")
+            code = proc.wait(timeout=remaining)
+            if code not in (0, 1):
+                raise RuntimeError("ripgrep search failed (no note content was logged)")
+            if code == 1 and output:
+                raise RuntimeError("ripgrep returned partial output on failure")
+            if output and output[-1] != 0:
+                raise RuntimeError("ripgrep returned incomplete paths")
+            results = {os.fsdecode(item) for item in bytes(output).split(b"\0") if item}
+            if not results <= paths.keys():
+                raise RuntimeError("ripgrep returned a path outside the search candidates")
+            return {paths[item] for item in results}
+        except subprocess.TimeoutExpired as exc:
+            raise TimeoutError("search exceeded timeout; narrow the request.") from exc
+        finally:
+            if proc.poll() is None:
+                proc.kill()
+            proc.wait()
+            if proc.stdout:
+                proc.stdout.close()
+
+
+def _search_notes_rg(*, root_dir: Path, base_dir: Path, normalized_query: list[str],
+                     in_markdown: bool, limits: RuntimeLimits) -> list[str]:
+    rg = shutil.which("rg")
+    if not rg:
+        raise RuntimeError("notes_search requires the ripgrep (rg) executable on PATH")
+    # argv cannot contain NUL. Keep literal matching for this uncommon query.
+    if any("\0" in term for term in normalized_query):
+        return _search_notes(root_dir=root_dir, base_dir=base_dir,
+                             normalized_query=normalized_query,
+                             in_markdown=in_markdown, limits=limits)
+    started = time.monotonic()
+    deadline = started + limits.operation_timeout_seconds
+    candidates: list[Path] = []
+    scanned_files = 0
+    for path in base_dir.rglob("*.md"):
+        _ensure_not_timed_out(started, limits.operation_timeout_seconds, "search")
+        if not path.is_file():
+            continue
+        scanned_files += 1
+        if scanned_files > limits.max_search_files:
+            raise ValueError("search exceeded file scan limit; narrow path or query.")
+        safe = _resolve_safe_path(root_dir, str(path), must_exist=True, expect_dir=False)
+        if _stat_contained_file(root_dir, safe).st_size > limits.max_search_file_bytes:
+            logger.warning("Skipping oversized note during search: %s",
+                           _escape_inline_text(_to_relative(root_dir, safe)))
+            continue
+        candidates.append(safe)
+
+    matches: set[str] = set()
+    # Keep argv below typical OS argument limits even for long paths and many terms.
+    base_size = sum(len(term.encode("utf-8")) + 4 for term in normalized_query) + 200
+    if base_size >= 100_000:
+        raise ValueError("search query exceeds ripgrep argument limit")
+    batches: list[list[Path]] = []
+    batch: list[Path] = []
+    size = base_size
+    for path in candidates:
+        path_size = len(os.fsencode(path)) + 2
+        if path_size + base_size > 100_000:
+            raise ValueError("search path exceeds ripgrep argument limit")
+        if batch and (size + path_size > 100_000 or len(batch) >= 200):
+            batches.append(batch)
+            batch, size = [], base_size
+        batch.append(path)
+        size += path_size
+    if batch:
+        batches.append(batch)
+
+    for batch in batches:
+        _ensure_not_timed_out(started, limits.operation_timeout_seconds, "search")
+        found = _rg_matches(rg, batch, normalized_query, deadline,
+                            min(4_000_000, limits.max_search_files * 4096),
+                            root_dir=root_dir, max_file_bytes=limits.max_search_file_bytes)
+        allowed = {str(path) for path in batch}
+        if not found <= allowed:
+            raise RuntimeError("ripgrep returned a path outside the search candidates")
+        for path in batch:
+            _ensure_not_timed_out(started, limits.operation_timeout_seconds, "search")
+            relative = _to_relative(root_dir, path)
+            try:
+                if _stat_contained_file(root_dir, path).st_size > limits.max_search_file_bytes:
+                    logger.warning("Skipping oversized note during search: %s", _escape_inline_text(relative))
+                    continue
+                # Python str.lower and rg -i differ for some Unicode letters (e.g. İ).
+                # Inspect non-ASCII files even if rg missed them; rg remains the
+                # literal, case-insensitive prefilter for the common ASCII corpus.
+                if str(path) not in found:
+                    probe = _read_bytes_with_limit(path, limits.max_search_file_bytes,
+                                                   "search input", root_dir=root_dir)
+                    if probe.isascii():
+                        continue
+                content = _read_text_with_limit(path, limits.max_search_file_bytes,
+                                                f"search input file {relative!r}",
+                                                root_dir=root_dir).lower()
+            except ValueError:
+                logger.warning("Skipping oversized note during search: %s", _escape_inline_text(relative))
+                continue
+            yaml_part, md_part, _ = _split_frontmatter(content)
+            if any(q in yaml_part for q in normalized_query) or (
+                in_markdown and any(q in md_part for q in normalized_query)
+            ):
+                matches.add(relative)
+                if len(matches) > limits.max_search_matches:
+                    raise ValueError("search exceeded match limit; narrow query.")
     return sorted(matches)
 
 
@@ -395,13 +693,13 @@ def create_mcp(root_dir: Path) -> FastMCP:
         relative = _to_relative(root_dir, target)
         logger.info("read path=%s", _escape_inline_text(relative))
         content = _read_text_with_limit(
-            target, limits.max_read_bytes, f"read input file {relative!r}"
+            target, limits.max_read_bytes, f"read input file {relative!r}", root_dir=root_dir
         )
         return _mark_untrusted_note_content(content, source=relative)
 
     @mcp.tool(name="notes_write")
     def write(path: str, yaml_frontmatter: str, markdown_content: str) -> str:
-        """Create or replace a markdown note using YAML frontmatter + markdown body.
+        """Create or replace an OKF v0.2 markdown document.
 
         Args:
             path: Relative output file path inside the notes root.
@@ -414,21 +712,28 @@ def create_mcp(root_dir: Path) -> FastMCP:
 
         Notes:
             - Parent directories are created automatically.
-            - Frontmatter syntax is validated with safe YAML parsing.
+            - Concepts require a YAML mapping with a non-empty type.
+            - Reserved index.md and log.md use empty frontmatter, except the root
+              index.md may declare okf_version: "0.2".
             - Payloads over the configured write-size limit are rejected.
             - Path traversal outside root is blocked.
         """
-        match_yaml = re.match(r"---\n(.*?)\n---\s*$", yaml_frontmatter, re.DOTALL)
-        if not match_yaml:
-            raise ValueError(r"YAML frontmatter doesn't match '---\n(.*)\n---'")
-        yaml.safe_load(match_yaml.group(1))  # validate
-        payload = f"{yaml_frontmatter}\n{markdown_content}"
-        _assert_text_size_within_limit(payload, limits.max_write_bytes, "write payload")
-
         target = _resolve_safe_path(root_dir, path, expect_dir=False)
-        target.parent.mkdir(parents=True, exist_ok=True)
-        target.write_text(payload, encoding="utf-8")
         relative = _to_relative(root_dir, target)
+        if target.suffix != ".md":
+            raise ValueError("OKF documents must use a .md filename")
+        if target.name in {"index.md", "log.md"}:
+            if yaml_frontmatter:
+                if target.name != "index.md" or target.parent != root_dir:
+                    raise ValueError("Reserved document cannot have YAML frontmatter")
+                _validate_okf_frontmatter(yaml_frontmatter, root_index=True)
+            payload = f"{yaml_frontmatter}\n{markdown_content}" if yaml_frontmatter else markdown_content
+        else:
+            _validate_okf_frontmatter(yaml_frontmatter)
+            payload = f"{yaml_frontmatter}\n{markdown_content}"
+        _assert_text_size_within_limit(payload, limits.max_write_bytes, "write payload")
+        _mkdir_contained(root_dir, target.parent)
+        _atomic_write(root_dir, target, payload)
         logger.info("write path=%s", _escape_inline_text(relative))
         return f"File written: {_escape_inline_text(relative)}"
 
@@ -475,7 +780,7 @@ def create_mcp(root_dir: Path) -> FastMCP:
             - Path traversal outside root is blocked.
         """
         target = _resolve_safe_path(root_dir, path)
-        target.mkdir(parents=True, exist_ok=True)
+        _mkdir_contained(root_dir, target)
         relative = _to_relative(root_dir, target)
         logger.info("mkdir path=%s", _escape_inline_text(relative))
         return f"Directory created: {_escape_inline_text(relative)}"
@@ -496,7 +801,13 @@ def create_mcp(root_dir: Path) -> FastMCP:
             - Path traversal outside root is blocked.
         """
         target = _resolve_safe_path(root_dir, path, expect_dir=False)
-        target.unlink(missing_ok=True)
+        if target == root_dir:
+            raise IsADirectoryError(f"Expected a file path: {path}")
+        try:
+            with _open_contained_directory(root_dir, target.parent) as parent_fd:
+                os.unlink(target.name, dir_fd=parent_fd)
+        except FileNotFoundError:
+            pass
         relative = _to_relative(root_dir, target)
         logger.info("rm path=%s", _escape_inline_text(relative))
         return f"File removed: {_escape_inline_text(relative)}"
@@ -519,7 +830,8 @@ def create_mcp(root_dir: Path) -> FastMCP:
         target = _resolve_safe_path(root_dir, path, must_exist=True, expect_dir=True)
         if target == root_dir:
             raise ValueError("Refusing to remove the notes root directory")
-        target.rmdir()
+        with _open_contained_directory(root_dir, target.parent) as parent_fd:
+            os.rmdir(target.name, dir_fd=parent_fd)
         relative = _to_relative(root_dir, target)
         logger.info("rmdir path=%s", _escape_inline_text(relative))
         return f"Directory removed: {_escape_inline_text(relative)}"
@@ -554,7 +866,7 @@ def create_mcp(root_dir: Path) -> FastMCP:
             logger.info("search path=%s terms=0 matches=0", _to_relative(root_dir, base_dir))
             return []
 
-        deduped = _search_notes(
+        deduped = _search_notes_rg(
             root_dir=root_dir,
             base_dir=base_dir,
             normalized_query=normalized_query,
@@ -589,13 +901,16 @@ def create_mcp(root_dir: Path) -> FastMCP:
             _ensure_not_timed_out(started_at, limits.operation_timeout_seconds, "list_tags")
             if not note_path.is_file():
                 continue
+            note_path = _contained_note(root_dir, note_path)
+            if note_path is None:
+                continue
 
             scanned_files += 1
             try:
                 # We only need the frontmatter, so we could potentially read just the start of the file
                 # but for simplicity and safety (limits), we use our helper.
                 content = _read_text_with_limit(
-                    note_path, limits.max_read_bytes, "list_tags scanning"
+                    note_path, limits.max_read_bytes, "list_tags scanning", root_dir=root_dir
                 )
                 _, _, yaml_dict = _split_frontmatter(content)
                 all_tags.update(_extract_tags(yaml_dict))
@@ -632,6 +947,9 @@ def create_mcp(root_dir: Path) -> FastMCP:
             _ensure_not_timed_out(started_at, limits.operation_timeout_seconds, "get_backlinks")
             if not note_path.is_file():
                 continue
+            note_path = _contained_note(root_dir, note_path)
+            if note_path is None:
+                continue
 
             scanned_files += 1
             relative_path = _to_relative(root_dir, note_path)
@@ -640,17 +958,11 @@ def create_mcp(root_dir: Path) -> FastMCP:
 
             try:
                 content = _read_text_with_limit(
-                    note_path, limits.max_read_bytes, "get_backlinks scanning"
+                    note_path, limits.max_read_bytes, "get_backlinks scanning", root_dir=root_dir
                 )
                 _, md_part, _ = _split_frontmatter(content)
-                links = _extract_links(md_part)
-
-                for link in links:
-                    link_low = link.lower()
-                    # Match if link is exactly the name, or the full path
-                    if link_low == target_name or link_low == target_full or link_low.endswith("/" + target_full):
-                        backlinks.add(relative_path)
-                        break
+                if _links_to_target(md_part, relative_path, target_full, target_name):
+                    backlinks.add(relative_path)
             except Exception:
                 continue
 
@@ -680,7 +992,8 @@ def create_mcp(root_dir: Path) -> FastMCP:
                 target = _resolve_safe_path(root_dir, path, must_exist=True, expect_dir=False)
                 relative = _to_relative(root_dir, target)
                 content = _read_text_with_limit(
-                    target, limits.max_read_bytes, f"read_multiple file {relative!r}"
+                    target, limits.max_read_bytes, f"read_multiple file {relative!r}",
+                    root_dir=root_dir,
                 )
                 results[relative] = _mark_untrusted_note_content(content, source=relative)
             except Exception as e:
@@ -711,16 +1024,19 @@ def create_mcp(root_dir: Path) -> FastMCP:
             _ensure_not_timed_out(started_at, limits.operation_timeout_seconds, "get_stats")
             if not note_path.is_file():
                 continue
+            note_path = _contained_note(root_dir, note_path)
+            if note_path is None:
+                continue
 
             total_notes += 1
-            mtime = note_path.stat().st_mtime
+            mtime = _stat_contained_file(root_dir, note_path).st_mtime
             if mtime > last_mod_time:
                 last_mod_time = mtime
                 last_mod_path = _to_relative(root_dir, note_path)
 
             try:
                 content = _read_text_with_limit(
-                    note_path, limits.max_read_bytes, "get_stats scanning"
+                    note_path, limits.max_read_bytes, "get_stats scanning", root_dir=root_dir
                 )
                 _, _, yaml_dict = _split_frontmatter(content)
                 tags = _extract_tags(yaml_dict)
