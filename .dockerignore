@@ -1,0 +1,8 @@
+**
+!Dockerfile
+!docker_entrypoint.py
+!pyproject.toml
+!uv.lock
+!notes_mcp.py
+!README.md
+!LICENSE

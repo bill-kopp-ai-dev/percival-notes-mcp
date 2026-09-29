@@ -100,6 +100,86 @@ Add the following configuration to your `~/.nanobot/config.json`:
 }
 ```
 
+## Docker (local stdio image)
+
+Build and test the image locally:
+
+```bash
+docker build -t percival-notes-mcp:docker-test .
+uv run python tests/smoke_stdio.py --docker-image percival-notes-mcp:docker-test
+uv run python tests/smoke_opencode.py        # isolated OpenCode MCP discovery (if installed)
+uv run python tests/benchmark_docker_startup.py  # five local launches, no notes
+docker image inspect percival-notes-mcp:docker-test --format '{{.Id}}'
+```
+
+The image installs the project from `uv.lock` (without dev dependencies) and
+Debian's `ripgrep`, and starts MCP over stdio. It accepts **no positional
+arguments**. `/vault` must be a mounted directory, or the container exits
+before the server can create an ephemeral vault. Create an existing, absolute
+host directory for the vault; use `--mount` (not `-v`, which may create an
+absent source). The default image user is 65532:65532; select a UID/GID that
+can write the vault. For example on Linux:
+
+```bash
+docker run --rm -i --read-only --tmpfs /tmp:rw,nosuid,nodev \
+  --network none --user "$(id -u):$(id -g)" \
+  --mount "type=bind,src=/absolute/path/to/existing-vault,dst=/vault" \
+  percival-notes-mcp:docker-test
+```
+
+Keep stdin attached (`-i`) and do not allocate a TTY (`-t`); stdout is the MCP
+protocol, logs go to stderr. Data persists in the mount; the root filesystem
+may be read-only. `/vault` can also be a Docker named volume, with suitable
+ownership and `volume-nocopy` in the mount options to avoid Docker copying the
+image's root-owned `/vault` directory into the volume. Initialize ownership of
+a new named volume before starting the server as the default UID (65532).
+The container does not need a Docker socket. Replace the example path and
+image tag with actual values in each host's config; clients do not
+necessarily expand `${VARIABLE}` placeholders in command arrays.
+
+Nanobot `tools.mcpServers` example (replace path and image tag; test against
+the installed Nanobot version, as support for Resource/Prompt wrappers varies):
+
+```json
+{
+  "tools": {
+    "mcpServers": {
+      "percival-notes": {
+        "command": "docker",
+        "args": ["run", "--rm", "-i", "--read-only", "--tmpfs", "/tmp:rw,nosuid,nodev", "--network", "none", "--user", "1000:1000", "--mount", "type=bind,src=/absolute/path/to/existing-vault,dst=/vault", "percival-notes-mcp:docker-test"],
+        "enabledTools": ["*"],
+        "toolTimeout": 30
+      }
+    }
+  }
+}
+```
+
+OpenCode `opencode.json` example (set `$schema` and substitute actual host
+UID/GID, vault path and image before use; restart OpenCode after editing):
+
+```json
+{
+  "$schema": "https://opencode.ai/config.json",
+  "mcp": {
+    "percival-notes": {
+      "type": "local",
+      "command": ["docker", "run", "--rm", "-i", "--read-only", "--tmpfs", "/tmp:rw,nosuid,nodev", "--network", "none", "--user", "1000:1000", "--mount", "type=bind,src=/absolute/path/to/existing-vault,dst=/vault", "percival-notes-mcp:docker-test"],
+      "enabled": true,
+      "timeout": 30000
+    }
+  }
+}
+```
+
+`opencode mcp list` checks connectivity; test the tool workflow with the host
+before claiming consumer integration. OpenCode may expose Resources/Prompts
+differently from an MCP SDK. Docker MCP Toolkit/Gateway requires a compatible
+`docker mcp` plugin, profile and a server definition with an explicit vault
+volume; the image alone is **not** a Toolkit registration. Do not enable it
+with `docker://...` and no mount. Neither Toolkit nor Nanobot integration is
+verified by the Docker smoke above.
+
 ---
 
 ## 🛠️ Development & Testing
