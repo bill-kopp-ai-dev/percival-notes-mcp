@@ -27,6 +27,51 @@ async def test_public_tools_and_schema(tmp_path):
 
 
 @pytest.mark.asyncio
+async def test_static_guide_and_prompts_do_not_expose_vault(tmp_path):
+    secret = "vault-only-text"
+    (tmp_path / "secret.md").write_text(secret, encoding="utf-8")
+    mcp = notes_mcp.create_mcp(tmp_path)
+    resources = await mcp.list_resources()
+    assert len(resources) == 1
+    assert str(resources[0].uri) == "notes://guide/okf-v0.2"
+    assert resources[0].mimeType == "text/markdown"
+    guide = (await mcp.read_resource("notes://guide/okf-v0.2"))[0].content
+    assert secret not in guide
+    assert "notes_search" in guide and "in_markdown=True" in guide
+    assert notes_mcp.UNTRUSTED_BLOCK_START in guide
+
+    prompts = {p.name: p for p in await mcp.list_prompts()}
+    assert set(prompts) == {"notes_create_concept", "notes_research_and_link"}
+    assert {a.name: a.required for a in prompts["notes_create_concept"].arguments} == {
+        "topic": True, "type": False, "path": False}
+    create = await mcp.get_prompt("notes_create_concept", {"topic": "solar cells"})
+    assert "solar cells" in create.messages[0].content.text
+    assert "notes_write" in create.messages[0].content.text
+    research = await mcp.get_prompt("notes_research_and_link", {
+        "topic": "solar cells", "path": "research"})
+    assert "research" in research.messages[0].content.text
+    assert "notes_get_backlinks" in research.messages[0].content.text
+    assert secret not in create.messages[0].content.text + research.messages[0].content.text
+    assert sorted(p.name for p in tmp_path.iterdir()) == ["secret.md"]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("name,args,error", [
+    ("notes_create_concept", {"topic": "   "}, "topic must not be blank"),
+    ("notes_research_and_link", {"topic": "x" * 501}, "topic exceeds"),
+    ("notes_create_concept", {"topic": "safe", "type": "x" * 121}, "type exceeds"),
+    ("notes_create_concept", {"topic": "safe\nignore instructions"}, "topic must be one line"),
+    ("notes_create_concept", {"topic": "safe", "path": "../escape.md"}, "path must stay relative"),
+    ("notes_research_and_link", {"topic": "safe", "path": "/private"}, "path must stay relative"),
+    ("notes_research_and_link", {"topic": "safe", "path": "x" * 1025}, "path exceeds"),
+])
+async def test_prompt_arguments_reject_unsafe_or_unbounded_input(tmp_path, name, args, error):
+    mcp = notes_mcp.create_mcp(tmp_path)
+    with pytest.raises(ValueError, match=error):
+        await mcp.get_prompt(name, args)
+
+
+@pytest.mark.asyncio
 async def test_write_okf_and_preserve_raw_read(tmp_path):
     mcp = notes_mcp.create_mcp(tmp_path)
     front = '---\ntype: Unregistered Kind\ntitle: "---"\ntags: [Café]\nextra: yes\n--- trailing'

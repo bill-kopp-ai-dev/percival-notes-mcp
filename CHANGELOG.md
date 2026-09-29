@@ -2,6 +2,7 @@
 
 ## Unreleased — OKF v0.2 + ripgrep
 
+- Add a static OKF v0.2 guide Resource and two optional workflow Prompts for creating concepts and researching/linking notes. Bound prompt arguments and reject blank topics, control characters and paths outside the vault. They do not read the vault or execute tools when retrieved; Nanobot support remains to be validated.
 - New concept writes require OKF YAML frontmatter with nonempty `type`; reserve `index.md` and `log.md` at every level and allow the optional root version declaration. Write validation is performed before atomic replacement.
 - Search uses local ripgrep as a bounded prefilter and retains literal OR matching against frontmatter (and optionally body) with Python verification. The `rg` executable is required for nonempty searches.
 - Preserve 12 MCP tool names/signatures, raw read envelopes and existing status/stats shapes; resolve bundle-relative and source-relative Markdown links for backlinks.

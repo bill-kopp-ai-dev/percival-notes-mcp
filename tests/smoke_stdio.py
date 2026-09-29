@@ -21,9 +21,30 @@ async def run() -> None:
                 await client.initialize()
                 tools = {tool.name for tool in (await client.list_tools()).tools}
                 assert tools == {"notes_read", "notes_write", "notes_glob", "notes_mkdir",
-                                 "notes_rm", "notes_rmdir", "notes_search", "notes_list_tags",
-                                 "notes_get_backlinks", "notes_read_multiple", "notes_get_stats",
-                                 "notes_get_status"}
+                                  "notes_rm", "notes_rmdir", "notes_search", "notes_list_tags",
+                                  "notes_get_backlinks", "notes_read_multiple", "notes_get_stats",
+                                  "notes_get_status"}
+
+                resources = (await client.list_resources()).resources
+                assert len(resources) == 1
+                assert str(resources[0].uri) == "notes://guide/okf-v0.2"
+                assert resources[0].mimeType == "text/markdown"
+                guide = (await client.read_resource(resources[0].uri)).contents[0].text
+                assert "type" in guide and "in_markdown=True" in guide
+                assert "<<<BEGIN_UNTRUSTED_NOTE_CONTENT>>>" in guide
+
+                prompts = {p.name: p for p in (await client.list_prompts()).prompts}
+                assert set(prompts) == {"notes_create_concept", "notes_research_and_link"}
+                assert {a.name: a.required for a in prompts["notes_create_concept"].arguments} == {
+                    "topic": True, "type": False, "path": False}
+                create = await client.get_prompt("notes_create_concept", {"topic": "solar cells"})
+                assert "solar cells" in create.messages[0].content.text
+                assert "notes_write" in create.messages[0].content.text
+                research = await client.get_prompt("notes_research_and_link", {
+                    "topic": "solar cells", "path": "group"})
+                assert "group" in research.messages[0].content.text
+                assert "notes_get_backlinks" in research.messages[0].content.text
+                assert list(Path(vault).iterdir()) == []  # Discovery/retrieval never reads or writes notes.
 
                 async def call(name: str, **kwargs):
                     response = await client.call_tool(name, kwargs)
@@ -68,7 +89,7 @@ async def run() -> None:
                 await client.initialize()
                 response = await client.call_tool("notes_search", {"query": "term"})
                 assert response.isError and "ripgrep" in response.content[0].text
-    print("stdio smoke passed: 12 tools, OKF read/write, rg, envelope, traversal, missing rg")
+    print("stdio smoke passed: 12 tools, resource, prompts, OKF read/write, rg, envelope, traversal, missing rg")
 
 
 if __name__ == "__main__":
