@@ -1,25 +1,27 @@
 # 🤖 Percival Notes - percival.OS MCP
 
-**Development version 0.1.5 (unreleased OKF refactor)**
+**Development version 0.1.5 — OKF v0.2 and ripgrep changes are unreleased**
 
 [![Python](https://img.shields.io/badge/python-3.11+-yellow.svg)]()
 [![MCP](https://img.shields.io/badge/mcp-server-blue.svg)]()
 [![percival.OS](https://img.shields.io/badge/percival.OS-ecosystem-orange.svg)](https://github.com/bill-kopp-ai-dev/percival.OS)
 
 ## 📋 Description
-Local MCP server for OKF v0.2 Markdown notes, with ripgrep-backed literal search.
-The operator confirmed on 2026-09-28 that the Nanobot consumer accepts the
-required `type` on new concept writes and the existing read envelope.
+Local stdio MCP server for an OKF v0.2 Markdown vault, with ripgrep-backed
+literal search. It can run directly with Python/`uv` or in a local Docker
+container with a mounted vault. The 12 existing `notes_*` tools are accompanied
+by a static OKF guide Resource and two optional workflow Prompts.
 
-This server is part of the **percival.OS** ecosystem, a Personal Agentic Operating System designed for autonomy, security, and absolute privacy.
+This server is part of the **percival.OS** ecosystem, a Personal Agentic
+Operating System focused on autonomy, security and privacy.
 
 ---
 
 ## 🛡️ percival.OS Principles
 Like all components of `percival.OS`, this MCP server strictly follows our core principles:
 
-- **Privacy First**: All note processing is performed locally. Your notes never leave your infrastructure.
-- **Data Sovereignty**: You have absolute control over where your notes are stored and how they are accessed.
+- **Privacy First**: The server processes notes locally; client access to notes and any onward use of tool results depend on the MCP client and its configuration.
+- **Data Sovereignty**: You choose the vault location and which clients receive access to this server.
 - **Hardened Security**: Strict root containment (path traversal blocking) and untrusted-data envelope marking to mitigate prompt-injection risks.
 - **Transparency**: Open-source and auditable to ensure full governance of your data.
 
@@ -29,15 +31,15 @@ Like all components of `percival.OS`, this MCP server strictly follows our core 
 The `percival-notes-mcp` offers advanced knowledge management capabilities:
 
 - `notes_read(path)`: Read a single note.
-- `notes_write(path, yaml_frontmatter, markdown_content)`: Create or update an OKF v0.2 document.
+- `notes_write(path, yaml_frontmatter, markdown_content)`: Create or replace an OKF v0.2 `.md` document; creates parent directories.
 - `notes_glob(pattern)`: List files matching a pattern.
 - `notes_mkdir(path)`: Create a directory.
 - `notes_rm(path)`: Remove a file.
 - `notes_rmdir(path)`: Remove a directory.
-- `notes_search(query, path=".", in_markdown=false)`: Search literal terms (OR) in YAML frontmatter, optionally also in the Markdown body, using `rg`.
-- `notes_list_tags()`: List all unique tags across notes.
-- `notes_get_backlinks(path)`: Find notes linking to a specific note.
-- `notes_read_multiple(paths)`: Read multiple notes in a single call.
+- `notes_search(query, path=".", in_markdown=false)`: Search literal, case-insensitive terms (OR) in YAML frontmatter, optionally also in the Markdown body, using `rg`; `query` accepts a list or a comma/semicolon/newline-separated string. Returns relative paths.
+- `notes_list_tags()`: List unique lower-case tags from `tags` or `keywords` in frontmatter.
+- `notes_get_backlinks(path)`: Find incoming wiki or local Markdown links (Markdown paths resolve relative to the source note).
+- `notes_read_multiple(paths)`: Read multiple notes in a single call; missing/invalid paths are skipped.
 - `notes_get_stats()`: Get repository overview (totals, top tags, etc).
 - `notes_get_status()`: Check server operational status.
 
@@ -68,16 +70,47 @@ the untrusted-data envelope. Prompt arguments are single-line, bounded strings
 
 ## OKF v0.2 and migration
 
-The notes root is an [OKF v0.2 bundle](https://github.com/GoogleCloudPlatform/open-knowledge-format/blob/main/SPEC.md): one UTF-8 `.md` per concept. For example, call `notes_write` with `path="topics/example.md"`, `yaml_frontmatter="---\ntype: Reference\ntags: [demo]\n---"` and `markdown_content="# Example\nDetails"`. Unknown types and extra YAML keys are allowed. A concept requires a nonempty string `type`; invalid writes fail before replacing the file. `index.md` and `log.md` at any level are reserved for directory listings/history: pass empty frontmatter, except root `index.md` may use `---\nokf_version: "0.2"\n---`. Existing files are not reformatted on read.
+The notes root is an [OKF v0.2 bundle](https://github.com/GoogleCloudPlatform/open-knowledge-format/blob/main/SPEC.md):
+one UTF-8 `.md` per concept. For example, call `notes_write` with:
+
+```text
+path="topics/example.md"
+yaml_frontmatter="---\ntype: Reference\ntags: [demo]\n---"
+markdown_content="# Example\nDetails"
+```
+
+Unknown types and extra YAML keys are allowed. A concept requires a nonempty
+string `type`; invalid writes fail before replacing the file. `index.md` and
+`log.md` at any level are reserved for directory listings/history: pass empty
+frontmatter, except root `index.md` may use
+`---\nokf_version: "0.2"\n---` (and no other keys). Existing files are not
+reformatted on read.
 
 The operator confirmed there is no existing vault to preserve. If that changes, export/backup it before cutover. New concept writes reject legacy frontmatter lacking `type`. `notes_read` and `notes_read_multiple` still return raw legacy files within the existing untrusted-data envelope; other scans tolerate malformed frontmatter, but legacy files are not OKF-conformant. The operator confirmed Nanobot's acceptance of the required `type`, reserved-file rules, relative Markdown backlinks and the current envelope (`Source:` plus `<<<BEGIN_UNTRUSTED_NOTE_CONTENT>>>` / `<<<END_UNTRUSTED_NOTE_CONTENT>>>` rather than XML or `[SECURITY WARNING:...]`).
 
-Install [ripgrep](https://ripgrep.org/) (`rg` on `PATH`) on the MCP host. `notes_search` reports an explicit error when `rg` is missing. It invokes `rg` locally using fixed-string, case-insensitive patterns over contained file descriptors, then verifies frontmatter/body matches under the existing search limits; a query containing NUL uses the bounded Python walker because process arguments cannot contain NUL. Hidden/ignored notes and safe file symlinks are included; external symlinks are blocked. Writes use anchored directory descriptors, fsync and atomic replacement; replacement preserves existing permission bits. `notes_glob` still uses Python globbing. No note contents are sent over the network by this server.
+Install [ripgrep](https://ripgrep.org/) (`rg` on `PATH`) on the host when running directly; the Docker image includes it. Nonempty `notes_search` queries report an explicit error when `rg` is missing. The server invokes `rg` locally using fixed-string, case-insensitive patterns over contained file descriptors, then verifies frontmatter/body matches under search limits; a query containing NUL uses the bounded Python walker because process arguments cannot contain NUL. Empty queries return no matches. Hidden/ignored notes and safe file symlinks are included; external symlinks are blocked. Search is **not** accent-insensitive (`cafe` does not match `café`). Oversized files are skipped. Writes use anchored directory descriptors, fsync and atomic replacement; replacement preserves existing permission bits. `notes_glob` still uses Python globbing. This server makes no outbound network requests for notes.
+
+Default limits (overridable with `PERCIVAL_NOTES_MCP_<NAME>` environment
+variables): read/write/search file size 1,000,000 bytes each (`MAX_READ_BYTES`,
+`MAX_WRITE_BYTES`, `MAX_SEARCH_FILE_BYTES`), glob results 2,000
+(`MAX_GLOB_RESULTS`), search files 5,000 (`MAX_SEARCH_FILES`), search matches
+1,000 (`MAX_SEARCH_MATCHES`) and operation timeout 20 seconds
+(`OPERATION_TIMEOUT_SECONDS`). Legacy `NOTES_MCP_<NAME>` variables are also
+accepted as fallbacks. Narrow the request if a limit is hit. See
+[the synthetic search characterization](docs/search-benchmark.md): parity was
+observed on that corpus, but the rg-backed wrapper was slower than the legacy
+walker there; no speedup is claimed.
 
 ---
 
 ## ⚙️ Configuration in percival.OS (Nanobot)
-Add the following configuration to your `~/.nanobot/config.json`:
+Install Python >=3.11, `uv` and `rg`, create a notes directory, and add the
+following to `~/.nanobot/config.json` (replace both paths). To start the stdio
+server directly, run:
+
+```bash
+uv run --directory /path/to/percival-notes-mcp percival-notes-mcp /path/to/your-notes
+```
 
 ```json
 {
@@ -92,13 +125,19 @@ Add the following configuration to your `~/.nanobot/config.json`:
           "percival-notes-mcp",
           "/path/to/your-notes"
         ],
-        "enabledTools": ["notes_read", "notes_write", "notes_glob", "notes_mkdir", "notes_rm", "notes_rmdir", "notes_search"],
+        "enabledTools": ["*"],
         "toolTimeout": 30
       }
     }
   }
 }
 ```
+
+`enabledTools: ["*"]` requests the full tool surface and, on Nanobot versions
+that support them, the Resource/Prompt wrappers. The operator confirmed on
+2026-09-28 that Nanobot accepts the OKF write requirements and existing read
+envelope; **an end-to-end run in Nanobot is still pending**, including verification
+of the installed version and Resource/Prompt exposure.
 
 ## Docker (local stdio image)
 
@@ -113,7 +152,7 @@ docker image inspect percival-notes-mcp:docker-test --format '{{.Id}}'
 ```
 
 The image installs the project from `uv.lock` (without dev dependencies) and
-Debian's `ripgrep`, and starts MCP over stdio. It accepts **no positional
+Debian's `ripgrep` 13.0.0, and starts MCP over stdio. It accepts **no positional
 arguments**. `/vault` must be a mounted directory, or the container exits
 before the server can create an ephemeral vault. Create an existing, absolute
 host directory for the vault; use `--mount` (not `-v`, which may create an
@@ -172,13 +211,17 @@ UID/GID, vault path and image before use; restart OpenCode after editing):
 }
 ```
 
-`opencode mcp list` checks connectivity; test the tool workflow with the host
-before claiming consumer integration. OpenCode may expose Resources/Prompts
+`opencode mcp list` checks connectivity: discovery was verified against an
+isolated dummy Docker vault, but tool calls through an OpenCode agent have not
+been exercised. OpenCode may expose Resources/Prompts
 differently from an MCP SDK. Docker MCP Toolkit/Gateway requires a compatible
 `docker mcp` plugin, profile and a server definition with an explicit vault
 volume; the image alone is **not** a Toolkit registration. Do not enable it
 with `docker://...` and no mount. Neither Toolkit nor Nanobot integration is
-verified by the Docker smoke above.
+verified by the Docker smoke above. The image smoke exercises all 12 tools,
+the Resource and Prompts, OKF write/read/search, envelope and path containment,
+and bind/named-volume persistence across containers. The release timing is not
+yet set; no tag or release has been published for this refactor.
 
 ---
 
