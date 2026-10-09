@@ -9,6 +9,18 @@ RUN uv sync --frozen --no-dev --no-editable
 
 FROM python:3.12-slim-bookworm@sha256:392307d22300de8b5986851a12d9176dfc0fc073e65bf6523ebd7dcbeb23564e
 
+ARG VERSION=0.0.0
+ARG GIT_SHA=unknown
+
+LABEL org.opencontainers.image.title="Percival Notes MCP" \
+      org.opencontainers.image.description="Percival MCP server for OKF v0.2 markdown notes and ripgrep search" \
+      org.opencontainers.image.source="https://github.com/bill-kopp-ai-dev/percival-notes-mcp" \
+      org.opencontainers.image.documentation="https://github.com/bill-kopp-ai-dev/percival-notes-mcp/blob/main/README.md" \
+      org.opencontainers.image.licenses="MIT" \
+      org.opencontainers.image.vendor="Positronic Bean Labs" \
+      org.opencontainers.image.version="${VERSION}" \
+      org.opencontainers.image.revision="${GIT_SHA}"
+
 ENV PATH=/opt/venv/bin:$PATH \
     HOME=/tmp \
     PYTHONUNBUFFERED=1 \
