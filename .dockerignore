@@ -3,6 +3,7 @@
 !docker_entrypoint.py
 !pyproject.toml
 !uv.lock
+!uv-bootstrap-requirements.lock
 !notes_mcp.py
 !README.md
 !LICENSE

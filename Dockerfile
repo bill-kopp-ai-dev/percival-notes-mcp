@@ -1,13 +1,15 @@
-FROM python:3.12-slim-bookworm@sha256:392307d22300de8b5986851a12d9176dfc0fc073e65bf6523ebd7dcbeb23564e AS builder
+FROM python:3.12-slim-bookworm@sha256:2ed6491b93cd49272ee6de2b5a38440c3448360322c089fc23e370722d74179d AS builder
 
 ENV UV_PROJECT_ENVIRONMENT=/opt/venv \
     UV_LINK_MODE=copy
 WORKDIR /app
-RUN python -m pip install --no-cache-dir uv==0.12.18
 COPY pyproject.toml uv.lock README.md notes_mcp.py LICENSE ./
+COPY uv-bootstrap-requirements.lock ./
+RUN python -m pip install --no-cache-dir --require-hashes --no-deps \
+    -r uv-bootstrap-requirements.lock
 RUN uv sync --frozen --no-dev --no-editable
 
-FROM python:3.12-slim-bookworm@sha256:392307d22300de8b5986851a12d9176dfc0fc073e65bf6523ebd7dcbeb23564e
+FROM python:3.12-slim-bookworm@sha256:2ed6491b93cd49272ee6de2b5a38440c3448360322c089fc23e370722d74179d
 
 ARG VERSION=0.0.0
 ARG GIT_SHA=unknown
@@ -25,7 +27,12 @@ ENV PATH=/opt/venv/bin:$PATH \
     HOME=/tmp \
     PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1
-RUN apt-get update \
+ARG DEBIAN_SNAPSHOT=20261009T000000Z
+RUN printf 'deb [check-valid-until=no] http://snapshot.debian.org/archive/debian/%s bookworm main\n' "$DEBIAN_SNAPSHOT" > /etc/apt/sources.list \
+    && printf 'deb [check-valid-until=no] http://snapshot.debian.org/archive/debian-security/%s bookworm-security main\n' "$DEBIAN_SNAPSHOT" >> /etc/apt/sources.list \
+    && rm -f /etc/apt/sources.list.d/debian.sources \
+    && apt-get -o Acquire::Check-Valid-Until=false update \
+    && apt-get upgrade -y --no-install-recommends \
     && apt-get install --no-install-recommends -y ripgrep=13.0.0-4+b2 \
     && rm -rf /var/lib/apt/lists/* \
     && mkdir -p /vault /app \
