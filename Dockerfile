@@ -36,7 +36,9 @@ RUN printf 'deb [check-valid-until=no] http://snapshot.debian.org/archive/debian
     && apt-get install --no-install-recommends -y ripgrep=13.0.0-4+b2 \
     && rm -rf /var/lib/apt/lists/* \
     && mkdir -p /vault /app \
-    && chmod 0755 /vault /app
+    && chmod 0755 /app \
+    && chown 65532:65532 /vault \
+    && chmod 0750 /vault
 COPY --from=builder /opt/venv /opt/venv
 COPY docker_entrypoint.py LICENSE /app/
 RUN chmod 0644 /app/docker_entrypoint.py /app/LICENSE
