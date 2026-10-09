@@ -141,7 +141,21 @@ of the installed version and Resource/Prompt exposure.
 
 ## Docker (local stdio image)
 
-Build and test the image locally:
+Create a persistent vault writable by the image's non-root UID/GID, then use the
+Compose stdio service (`-T` prevents Docker from allocating a TTY):
+
+```bash
+install -d "$HOME/.local/share/percival-notes/vault"
+sudo chown 65532:65532 "$HOME/.local/share/percival-notes/vault"
+docker compose build
+docker compose run --rm -T percival-notes
+```
+
+Set `NOTES_VAULT_HOST_PATH` to use another existing absolute host directory.
+That bind mount is the only persistent writable path; `/tmp` is a bounded
+tmpfs and the rest of the container root is read-only.
+
+Build and smoke the image directly when needed:
 
 ```bash
 docker build -t percival-notes-mcp:docker-test .
@@ -168,10 +182,9 @@ docker run --rm -i --read-only --tmpfs /tmp:rw,nosuid,nodev \
 
 Keep stdin attached (`-i`) and do not allocate a TTY (`-t`); stdout is the MCP
 protocol, logs go to stderr. Data persists in the mount; the root filesystem
-may be read-only. `/vault` can also be a Docker named volume, with suitable
-ownership and `volume-nocopy` in the mount options to avoid Docker copying the
-image's root-owned `/vault` directory into the volume. Initialize ownership of
-a new named volume before starting the server as the default UID (65532).
+may be read-only. `/vault` can also be a Docker named volume: the image creates
+the mount target as UID/GID 65532:65532, so Docker's initial volume copy-up
+preserves a writable owner for the default image user.
 The container does not need a Docker socket. Replace the example path and
 image tag with actual values in each host's config; clients do not
 necessarily expand `${VARIABLE}` placeholders in command arrays.
