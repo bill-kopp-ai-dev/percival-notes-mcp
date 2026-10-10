@@ -23,7 +23,7 @@ async def call_tool(client: ClientSession, name: str, **kwargs):
     return json.loads(response.content[0].text)
 
 
-async def run(image: str | None = None) -> None:
+async def run(image: str | None = None, vault_target: str = "/vault") -> None:
     command = shutil.which("docker" if image else "percival-notes-mcp")
     assert command, "Install Docker or the console script first"
     if not image:
@@ -33,7 +33,10 @@ async def run(image: str | None = None) -> None:
             args = ["run", "--rm", "-i", "--read-only", "--tmpfs", "/tmp:rw,nosuid,nodev",
                     "--network", "none", "--pids-limit", "128", "--memory", "512m",
                     "--user", f"{os.getuid()}:{os.getgid()}", "--mount",
-                    f"type=bind,src={vault},dst=/vault", image]
+                    f"type=bind,src={vault},dst={vault_target}"]
+            if vault_target != "/vault":
+                args.extend(["--env", f"PERCIVAL_NOTES_VAULT_PATH={vault_target}"])
+            args.append(image)
         else:
             args = [vault]
         params = StdioServerParameters(command=command, args=args)
@@ -128,7 +131,7 @@ async def run(image: str | None = None) -> None:
         if image:
             absent = subprocess.run([command, "run", "--rm", image], capture_output=True,
                                     text=True, timeout=30, check=False)
-            assert absent.returncode != 0 and "/vault must be a mounted directory" in absent.stderr
+            assert absent.returncode != 0 and "configured vault path must be a mounted directory" in absent.stderr
             assert not absent.stdout
             missing = vault + "-missing"
             absent_source = subprocess.run([command, "run", "--rm", "--mount",
@@ -185,4 +188,6 @@ async def run(image: str | None = None) -> None:
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--docker-image", help="Local image to smoke via docker run")
-    asyncio.run(run(parser.parse_args().docker_image))
+    parser.add_argument("--vault-target", default="/vault", help="Container path for the mounted vault")
+    parsed = parser.parse_args()
+    asyncio.run(run(parsed.docker_image, parsed.vault_target))

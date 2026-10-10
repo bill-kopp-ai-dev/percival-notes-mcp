@@ -34,7 +34,11 @@ RUN printf 'deb [check-valid-until=no] http://snapshot.debian.org/archive/debian
     && apt-get -o Acquire::Check-Valid-Until=false update \
     && apt-get upgrade -y --no-install-recommends \
     && apt-get install --no-install-recommends -y ripgrep=14.1.1-1+b4 \
+    && chmod u-s /usr/bin/mount \
+    && rm -f /usr/bin/nsenter /usr/bin/infocmp \
     && rm -rf /var/lib/apt/lists/* \
+    && chmod u-s /usr/bin/mount \
+    && rm -f /usr/bin/nsenter /usr/bin/infocmp \
     && mkdir -p /vault /app \
     && chmod 0755 /app \
     && chown 65532:65532 /vault \
