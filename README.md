@@ -173,6 +173,11 @@ host directory for the vault; use `--mount` (not `-v`, which may create an
 absent source). The default image user is 65532:65532; select a UID/GID that
 can write the vault. For example on Linux:
 
+The default mount target is `/vault`. Broker-managed deployments that mount
+host paths below a controlled prefix may set `PERCIVAL_NOTES_VAULT_PATH` to the
+resulting in-container mount path. The entrypoint still requires that exact
+path to be an existing, mounted, readable and writable directory.
+
 ```bash
 docker run --rm -i --read-only --tmpfs /tmp:rw,nosuid,nodev \
   --network none --user "$(id -u):$(id -g)" \
