@@ -30,7 +30,8 @@ async def run(image: str | None = None, vault_target: str = "/vault") -> None:
         assert shutil.which("rg"), "Install ripgrep first"
     with tempfile.TemporaryDirectory(prefix="notes-okf-smoke-") as vault:
         if image:
-            args = ["run", "--rm", "-i", "--read-only", "--tmpfs", "/tmp:rw,nosuid,nodev",
+            args = ["run", "--rm", "-i", "--init", "--read-only",
+                    "--tmpfs", "/tmp:rw,nosuid,nodev",
                     "--network", "none", "--pids-limit", "128", "--memory", "512m",
                     "--user", f"{os.getuid()}:{os.getgid()}", "--mount",
                     f"type=bind,src={vault},dst={vault_target}"]
@@ -157,7 +158,7 @@ async def run(image: str | None = None, vault_target: str = "/vault") -> None:
                                 "chown", "--mount", f"type=volume,src={volume},dst=/vault,volume-nocopy",
                                 image, "65532:65532", "/vault"], check=True, capture_output=True)
                 volume_params = StdioServerParameters(command=command, args=[
-                    "run", "--rm", "-i", "--mount",
+                    "run", "--rm", "-i", "--init", "--mount",
                     f"type=volume,src={volume},dst=/vault,volume-nocopy", image,
                 ])
                 async with stdio_client(volume_params) as (reader, writer):

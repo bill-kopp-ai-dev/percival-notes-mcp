@@ -14,7 +14,8 @@ async def main() -> None:
     samples = []
     with tempfile.TemporaryDirectory(prefix="notes-startup-") as vault:
         params = StdioServerParameters(command="docker", args=[
-            "run", "--rm", "-i", "--read-only", "--tmpfs", "/tmp:rw,nosuid,nodev",
+            "run", "--rm", "-i", "--init", "--read-only",
+            "--tmpfs", "/tmp:rw,nosuid,nodev",
             "--network", "none", "--user", f"{os.getuid()}:{os.getgid()}",
             "--mount", f"type=bind,src={vault},dst=/vault", "percival-notes-mcp:docker-test",
         ])

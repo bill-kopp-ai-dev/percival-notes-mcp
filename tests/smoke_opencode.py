@@ -17,7 +17,8 @@ def main() -> None:
         vault.mkdir()
         config = {"$schema": "https://opencode.ai/config.json", "mcp": {
             "percival-notes": {"type": "local", "enabled": True, "timeout": 30000,
-                               "command": ["docker", "run", "--rm", "-i", "--read-only",
+                               "command": ["docker", "run", "--rm", "-i", "--init",
+                                           "--read-only",
                                            "--tmpfs", "/tmp:rw,nosuid,nodev", "--network", "none",
                                            "--user", f"{os.getuid()}:{os.getgid()}", "--mount",
                                            f"type=bind,src={vault},dst=/vault",

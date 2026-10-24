@@ -179,15 +179,16 @@ resulting in-container mount path. The entrypoint still requires that exact
 path to be an existing, mounted, readable and writable directory.
 
 ```bash
-docker run --rm -i --read-only --tmpfs /tmp:rw,nosuid,nodev \
+docker run --rm -i --init --read-only --tmpfs /tmp:rw,nosuid,nodev \
   --network none --user "$(id -u):$(id -g)" \
   --mount "type=bind,src=/absolute/path/to/existing-vault,dst=/vault" \
   percival-notes-mcp:docker-test
 ```
 
 Keep stdin attached (`-i`) and do not allocate a TTY (`-t`); stdout is the MCP
-protocol, logs go to stderr. Data persists in the mount; the root filesystem
-may be read-only. `/vault` can also be a Docker named volume: the image creates
+protocol, logs go to stderr. `--init` gives the container its single init
+layer: the image embeds none, so the launcher owns it. Data persists in the
+mount; the root filesystem may be read-only. `/vault` can also be a Docker named volume: the image creates
 the mount target as UID/GID 65532:65532, so Docker's initial volume copy-up
 preserves a writable owner for the default image user.
 The container does not need a Docker socket. Replace the example path and
