@@ -9,6 +9,9 @@ services:
       context: .
       dockerfile: Dockerfile
     image: percival-notes-mcp:dev
+    # Match the image's non-root account; the vault host directory must be
+    # writable by UID/GID 65532 as documented above.
+    user: "65532:65532"
     init: true
     stdin_open: true
     tty: false
