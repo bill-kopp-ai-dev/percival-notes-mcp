@@ -54,7 +54,7 @@ jobs:
           test "$(docker image inspect percival-notes-mcp:ci --format '{{.Os}}/{{.Architecture}}')" = linux/amd64
           test "$(docker image inspect percival-notes-mcp:ci --format '{{.Config.User}}')" = 65532:65532
           test "$(docker image inspect percival-notes-mcp:ci --format '{{json .Config.Healthcheck}}')" = null
-          test "$(docker image inspect percival-notes-mcp:ci --format '{{index .Config.Labels \"org.opencontainers.image.revision\"}}')" = "$GITHUB_SHA"
+          test "$(docker image inspect percival-notes-mcp:ci --format '{{index .Config.Labels "org.opencontainers.image.revision"}}')" = "$GITHUB_SHA"
       - name: MCP stdio conformance (offline, no TTY or ports)
         run: >-
           python3 scripts/docker-ci-conformance.py
