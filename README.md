@@ -114,7 +114,9 @@ Create a backup (the caller must be able to read every note; use root or the
 vault owner for mode-0600 files):
 
 ```bash
-sudo scripts/vault-backup.sh --vault /absolute/path/to/vault
+sudo scripts/vault-backup.sh \
+  --vault /absolute/path/to/vault \
+  --dest "$HOME/.local/share/percival-notes/backups"
 ```
 
 Each backup includes a tar archive recording numeric UID/GID, a SHA-256

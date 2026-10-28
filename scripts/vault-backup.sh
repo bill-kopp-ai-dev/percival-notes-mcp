@@ -61,11 +61,9 @@ case "$LABEL" in
     *[!A-Za-z0-9._-]*) fail "label must use letters, digits, dot, underscore or dash" ;;
 esac
 
-if [ ! -d "$DEST" ]; then
-    mkdir -p "$DEST"
-    chmod 0700 "$DEST"
-fi
+mkdir -p "$DEST"
 DEST="$(cd "$DEST" && pwd -P)"
+chmod 0700 "$DEST"
 
 STAMP="$(date -u +%Y%m%dT%H%M%SZ)"
 ARCHIVE="$DEST/${STAMP}-${LABEL}.tar"

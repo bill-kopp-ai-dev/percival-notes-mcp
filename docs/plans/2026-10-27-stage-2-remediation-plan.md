@@ -25,18 +25,14 @@ busca ripgrep/fallback, containment e envelopes de conteúdo não confiável.
 
 ## 2. Preparação e decisões
 
-- [ ] Ler instruções/README/contrato de vault; registrar SHA/worktree e reconciliar
-  documentos localmente excluídos com o owner sem restaurá-los implicitamente.
-- [ ] Criar somente fixtures sintéticas para falhas, restore, permissões e symlinks;
-  registrar UID/GID efetivos, manifestos de conteúdo e caminhos de teste.
-- [ ] Owner define retenção/restore do vault; gestores definem candidato/runtime.
-  S2-C01 fixa init/perfil/mount; S2-C03 metadados/scan, S2-C04 harness.
-- [ ] Dimensionar lotes com bill (D-06). Broker só após `nanobot/A-001` fechado;
-  plano operacional do piloto aguarda D-05. Nenhum vault real no piloto deste plano.
+- [x] Ler instruções/README/contrato de vault; baseline do checkout `40fd2af2902ed2f94d528b84052428ec808b0b1e`; preservadas as exclusões preexistentes de `docs/search-benchmark.md` e, até a decisão explícita abaixo, da nota F3.
+- [x] Criar somente fixtures sintéticas para falhas, restore, permissões e symlinks; restore validado com UID/GID `65532:65532`, manifesto SHA-256, leitura MCP, busca e escrita; negativo de owner incorreto explícito.
+- [x] Owner (Bill, 2026-10-28) definiu retenção de backups fora do vault, 7 diários + 4 semanais; init único pelo launcher; aceitação da limitação de reprodutibilidade após medição; destino original para F3 e sem VEX se scan limpo; logs com path somente em DEBUG; contrato `{notes, omitted}`; autorização para commit e push em `origin/main` do produto. S2-C01/C03 continuam drafts não adotados.
+- [ ] D-06: sem compromisso de horas, prazo ou custo. D-05 permanece pendente e nenhum vault real foi usado.
 
 ## 3. Backlog integral e aceite
 
-Todas as ações **não iniciadas**; parcelas de runtime/CI permanecem externas.
+O backlog e os aceites abaixo preservam o escopo emitido. O retorno parcial e o estado por ação estão na seção 6; parcelas de runtime/CI permanecem externas.
 
 | Ação | Achados / P | Trabalho e áreas previstas | Dependência / dono externo | Aceite verificável |
 |---|---|---|---|---|
@@ -80,14 +76,14 @@ Sem prazo/horas/custo presumidos.
 
 ## 5. Qualificação futura no projeto
 
-- [ ] `uv run pytest -q`, regressões significativas e checks locais existentes;
+- [x] `uv run pytest -q`, regressões significativas e checks locais existentes;
   não introduzir lint/cobertura como requisito novo sem decisão do produto.
-- [ ] Build identificado e smoke MCP stdio, init único, stdout JSON-RPC-only;
+- [x] Build identificado e smoke MCP stdio, init único, stdout JSON-RPC-only;
   write/read/search em fixture OKF com ripgrep e fallback aplicáveis.
-- [ ] Repetir contenção/glob/symlinks, frontmatter, stats/leituras parciais e logs;
+- [x] Repetir contenção/glob/symlinks, frontmatter, stats/leituras parciais e logs;
   comparar conteúdo/owner após backup/restore e recriação do container.
 - [ ] Revalidar `V-BUILD`, `V-RUN`, `V-CONFIG`, `V-DATA`, `V-MCP`, `V-FUNC` e
-  `V-REUSE` afetados; `V-PILOT` só muda com prova do plano próprio, não com mock.
+  `V-REUSE` afetados; `V-PILOT` só muda com prova do plano próprio, não com mock. Build/smoke locais não qualificam o runtime nem o piloto.
 - [ ] Receber evidência dos gestores, CI/scan e limites externos; não afirmar que
   imagem histórica ativa está qualificada pelos testes do candidato.
 
@@ -96,20 +92,20 @@ ou publicação pendente não se encerra por documentação da solicitação.
 
 ## 6. Penúltima etapa — documentar execução neste plano
 
-- [ ] Registrar ações/subtarefa, owner/data, SHA inicial/final, mudanças, comandos,
+- [x] Registrar ações/subtarefa, owner/data, SHA inicial/final, mudanças, comandos,
   ambiente, evidências sanitizadas locais e vereditos `V-*` pós-correção.
-- [ ] Registrar decisões de retenção/owner e pendências; complementar seção 9 do
+- [x] Registrar decisões de retenção/owner e pendências; complementar seção 9 do
   relatório IaC quando autorizado, preservando baseline e sem conteúdo do vault real.
 
 | Data / owner | Ações / achados | SHA inicial → final | Mudanças / evidências locais | Resultado / V-* / pendências |
 |---|---|---|---|---|
-| Pendente | A-001–A-012; S2-NT-X01 | A registrar | Nenhuma execução nesta emissão | Não iniciada |
+| 2026-10-28 / bill (owner), Positronic (execução local) | A-001, A-002, A-004, A-005, A-007–A-012 verificadas localmente (**10/12**); A-003 parcial (candidato pronto; solicitação de repin/hardening a encaminhar aos gestores); A-006 pendente de encaminhamento/investigação no broker; S2-NT-X01 bloqueado por schema/destino S2-C03 não selecionados | Inicial `40fd2af2902ed2f94d528b84052428ec808b0b1e`; baseline do candidato `fbf1a2911e522f184c1945924c95796533062fb6` | `uv run pytest -q`: 68 passed; smoke MCP stdio (12 tools, resource, prompts, read/write/search, containment, persistence) e `docker-ci-conformance.py` aprovados. Dois builds `--no-cache`: image IDs `sha256:c7944fbd28a5f0b0a6fda557a2597c636facb136fe9a58451875c4ac19aa8674` e `sha256:618845639f43f1297a400231df4fa551149b2e5584b166cea4fecd8474041eec`; rootfs 7.363 membros, 6 diferenças de conteúdo/hash (cache ldconfig, logs apt/dpkg, `RECORD`, `uv_cache.json`) e 2.308 mtimes divergentes; não reprodutibilidade aceita pelo owner. Trivy 0.76.1, DB atualizada em 2026-10-28: 0 CVEs em 105 pacotes Debian e dependências Python; nota F3 restaurada, sem VEX por decisão do owner. Lifecycle: com `--init` 99 ms/exit 143; sem init, cerca de 1,8 s/exit 0 no candidato; E-022 original não reproduzido. Restore em fixture verificou SHA, modos, UID/GID, leitura/busca/escrita MCP e negativo owner 0:0. | Local: A-001/A-002 liberam somente fixture sintética; A-004 e A-012 aceitos localmente; A-005 limitação aceita. Externos pendentes: repin e runtime hardened (`cap-drop ALL`, NNP, rootfs RO, vault correto/rollback); encaminhamento/investigação do broker A-006; scan CI/retenção; schema/index S2-C03 e harness comum S2-C04; nenhum piloto/publicação liberado. `V-*`: evidência parcial local, V-PILOT não avaliado. |
 
 ## 7. Última etapa — atualizar o plano coordenador
 
-- [ ] Reler o [stage-2 geral](../../../positronic-bean-IaC/docs/plans/2026-10-27-iac-v1-stage-2-remediation-plan.md);
+- [x] Reler o [stage-2 geral](../../../positronic-bean-IaC/docs/plans/2026-10-27-iac-v1-stage-2-remediation-plan.md);
   atualizar **S2-NT na seção 3** e adicionar retorno na **seção 7**, com contagens,
   SHA/evidências, aceites locais/externos e dependências liberadas para o piloto.
-- [ ] Preservar outros retornos e informar efeito sobre M1/etapas 2/4/5. Sem
+- [x] Preservar outros retornos e informar efeito sobre M1/etapas 2/4/5. Sem
   acesso à IaC, entregar resumo e manter **aguardando sincronização**. Concluído
   exige aceites e retorno efetivo; registrar parcial se existir ação transferida/aberta.

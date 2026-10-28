@@ -14,6 +14,8 @@ import subprocess
 from pathlib import Path
 
 import pytest
+from mcp import ClientSession, StdioServerParameters
+from mcp.client.stdio import stdio_client
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 RUNTIME_UID = 65532
@@ -21,10 +23,20 @@ RUNTIME_GID = 65532
 BASE_IMAGE = (
     "debian:forky-slim@sha256:4cee6ff3ebc49e32d55a857e25164ef8e5f8fecff2a186c6393f7e8bd8c23b53"
 )
+PRODUCT_IMAGE = "percival-notes-mcp:stage2-candidate"
 
 pytestmark = pytest.mark.skipif(
     not shutil.which("docker"), reason="requires a docker daemon for the root-only steps"
 )
+
+
+def _product_image_available() -> bool:
+    if not shutil.which("docker"):
+        return False
+    return subprocess.run(
+        ["docker", "image", "inspect", PRODUCT_IMAGE],
+        capture_output=True, check=False,
+    ).returncode == 0
 
 
 def _run_in_container(workdir: Path, script: str, *, check: bool = True) -> subprocess.CompletedProcess:
@@ -147,6 +159,54 @@ def test_backup_keeps_the_documented_retention(synthetic_vault: Path) -> None:
     assert len(remaining) <= 7 + 4 + 1
     assert len(remaining) >= 7
     assert remaining[-1].startswith("20261028T")
+
+
+@pytest.mark.asyncio
+@pytest.mark.skipif(
+    not _product_image_available(),
+    reason="requires the local stage2 candidate image",
+)
+async def test_restored_fixture_supports_mcp_read_search_and_write(synthetic_vault: Path) -> None:
+    """Exercise the actual MCP process on a restored vault, not just tar probes."""
+    _run_in_container(
+        synthetic_vault,
+        """
+        set -e
+        /repo/scripts/vault-backup.sh --vault /work/vault --dest /work/backups --label stage2
+        archive=$(ls -1 /work/backups/*.tar)
+        /repo/scripts/vault-restore.sh --archive "$archive" --target /work/restored
+        """,
+    )
+    restored_vault = synthetic_vault / "restored" / "vault"
+    params = StdioServerParameters(
+        command="docker",
+        args=[
+            "run", "--rm", "-i", "--init", "--network=none", "--read-only",
+            "--tmpfs", "/tmp:rw,nosuid,nodev", "--user", f"{RUNTIME_UID}:{RUNTIME_GID}",
+            "--mount", f"type=bind,src={restored_vault},dst=/vault", PRODUCT_IMAGE,
+        ],
+    )
+    async with stdio_client(params) as (reader, writer):
+        async with ClientSession(reader, writer) as client:
+            await client.initialize()
+            read = await client.call_tool("notes_read", {"path": "note.md"})
+            assert not read.isError
+            assert "# Note" in read.content[0].text
+            search = await client.call_tool("notes_search", {"query": "demo"})
+            assert not search.isError
+            assert "note.md" in search.content[0].text
+            write = await client.call_tool(
+                "notes_write",
+                {"path": "restored-write.md",
+                 "yaml_frontmatter": "---\ntype: Reference\n---",
+                 "markdown_content": "written after restore"},
+            )
+            assert not write.isError
+            verify = await client.call_tool(
+                "notes_read", {"path": "restored-write.md"}
+            )
+            assert not verify.isError
+            assert "written after restore" in verify.content[0].text
 
 
 def _value(output: str, key: str) -> str:
