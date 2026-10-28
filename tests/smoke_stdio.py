@@ -99,9 +99,12 @@ async def run(image: str | None = None, vault_target: str = "/vault") -> None:
                 assert await call("notes_list_tags") == ["local"]
                 assert await call("notes_get_backlinks", path="group/two.md") == ["group/one.md"]
                 multiple = await call("notes_read_multiple", paths=["group/one.md", "../bad.md"])
-                assert set(multiple) == {"group/one.md"}
-                assert "<<<BEGIN_UNTRUSTED_NOTE_CONTENT>>>" in multiple["group/one.md"]
+                assert set(multiple["notes"]) == {"group/one.md"}
+                assert "<<<BEGIN_UNTRUSTED_NOTE_CONTENT>>>" in multiple["notes"]["group/one.md"]
+                assert [(item["path"], item["reason"]) for item in multiple["omitted"]] == [
+                    ("../bad.md", "outside_vault")]
                 assert (await call("notes_get_stats"))["total_notes"] == 2
+                assert (await call("notes_get_stats"))["unreadable_files"] == 0
                 assert "operational" in await call("notes_get_status")
                 response = await client.call_tool("notes_read", {"path": "../bad.md"})
                 assert response.isError

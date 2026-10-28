@@ -39,9 +39,9 @@ The `percival-notes-mcp` offers advanced knowledge management capabilities:
 - `notes_search(query, path=".", in_markdown=false)`: Search literal, case-insensitive terms (OR) in YAML frontmatter, optionally also in the Markdown body, using `rg`; `query` accepts a list or a comma/semicolon/newline-separated string. Returns relative paths.
 - `notes_list_tags()`: List unique lower-case tags from `tags` or `keywords` in frontmatter.
 - `notes_get_backlinks(path)`: Find incoming wiki or local Markdown links (Markdown paths resolve relative to the source note).
-- `notes_read_multiple(paths)`: Read multiple notes in a single call; missing/invalid paths are skipped.
-- `notes_get_stats()`: Get repository overview (totals, top tags, etc).
-- `notes_get_status()`: Check server operational status.
+- `notes_read_multiple(paths)`: Read multiple notes in a single call; returns `{notes: {path: content}, omitted: [{path, reason}]}` so unreadable, missing, oversized and outside-vault paths are explicit.
+- `notes_get_stats()`: Get repository overview (totals, top tags, etc), including unreadable-file count and bounded relative paths.
+- `notes_get_status()`: Check server operational status and product version without disclosing the vault path.
 
 ### Resources and Prompts
 
@@ -88,7 +88,7 @@ reformatted on read.
 
 The operator confirmed there is no existing vault to preserve. If that changes, export/backup it before cutover. New concept writes reject legacy frontmatter lacking `type`. `notes_read` and `notes_read_multiple` still return raw legacy files within the existing untrusted-data envelope; other scans tolerate malformed frontmatter, but legacy files are not OKF-conformant. The operator confirmed Nanobot's acceptance of the required `type`, reserved-file rules, relative Markdown backlinks and the current envelope (`Source:` plus `<<<BEGIN_UNTRUSTED_NOTE_CONTENT>>>` / `<<<END_UNTRUSTED_NOTE_CONTENT>>>` rather than XML or `[SECURITY WARNING:...]`).
 
-Install [ripgrep](https://ripgrep.org/) (`rg` on `PATH`) on the host when running directly; the Docker image includes it. Nonempty `notes_search` queries report an explicit error when `rg` is missing. The server invokes `rg` locally using fixed-string, case-insensitive patterns over contained file descriptors, then verifies frontmatter/body matches under search limits; a query containing NUL uses the bounded Python walker because process arguments cannot contain NUL. Empty queries return no matches. Hidden/ignored notes and safe file symlinks are included; external symlinks are blocked. Search is **not** accent-insensitive (`cafe` does not match `café`). Oversized files are skipped. Writes use anchored directory descriptors, fsync and atomic replacement; replacement preserves existing permission bits. `notes_glob` still uses Python globbing. This server makes no outbound network requests for notes.
+Install [ripgrep](https://ripgrep.org/) (`rg` on `PATH`) on the host when running directly; the Docker image includes it (version 15.2.0 in the current Dockerfile). Nonempty `notes_search` queries report an explicit error when `rg` is missing. The server invokes `rg` locally using fixed-string, case-insensitive patterns over contained file descriptors, then verifies frontmatter/body matches under search limits; a query containing NUL uses the bounded Python walker because process arguments cannot contain NUL. Empty queries return no matches. Hidden/ignored notes and safe file symlinks are included; external symlinks are skipped with a sanitized warning while valid notes remain searchable. Search is **not** accent-insensitive (`cafe` does not match `café`). Oversized files are skipped. Writes use anchored directory descriptors, fsync and atomic replacement; replacement preserves existing permission bits. `notes_glob` rejects absolute patterns and `..` before enumeration. This server makes no outbound network requests for notes.
 
 Default limits (overridable with `PERCIVAL_NOTES_MCP_<NAME>` environment
 variables): read/write/search file size 1,000,000 bytes each (`MAX_READ_BYTES`,
@@ -99,7 +99,53 @@ variables): read/write/search file size 1,000,000 bytes each (`MAX_READ_BYTES`,
 accepted as fallbacks. Narrow the request if a limit is hit. See
 [the synthetic search characterization](docs/search-benchmark.md): parity was
 observed on that corpus, but the rg-backed wrapper was slower than the legacy
-walker there; no speedup is claimed.
+walker there; no speedup is claimed. This historical document may be absent in
+some working checkouts.
+
+### Vault backup and restore
+
+The vault is user data. The operator owns backup storage and retention; the
+current owner decision is to store backups outside the vault at
+`~/.local/share/percival-notes/backups`, retaining the newest seven daily and
+four weekly snapshots. The scripts accept `--dest` to select another protected
+location. Backups contain note contents, so keep the destination private.
+
+Create a backup (the caller must be able to read every note; use root or the
+vault owner for mode-0600 files):
+
+```bash
+sudo scripts/vault-backup.sh --vault /absolute/path/to/vault
+```
+
+Each backup includes a tar archive recording numeric UID/GID, a SHA-256
+per-file content/owner/mode manifest, archive checksum and metadata. Restore
+requires root to apply numeric ownership, refuses a non-empty target, checks
+content and owner against the manifest, and only succeeds after the runtime
+identity (default `65532:65532`) can read a note and write/remove a probe:
+
+```bash
+sudo scripts/vault-restore.sh \
+  --archive "$HOME/.local/share/percival-notes/backups/<archive>.tar" \
+  --target /absolute/path/to/empty-restore-parent
+```
+
+The restored vault is placed at `<target>/<vault-name>`. Do not restore over a
+live vault. The procedure does not operate on or validate a production vault;
+exercise it first with a synthetic fixture. If the candidate image uses a
+different UID/GID, pass `--uid` and `--gid` only after confirming that identity.
+
+### Container lifecycle contract
+
+The image embeds no init. The single runtime manager/launcher must provide
+exactly one init (`docker run --init` or Compose `init: true`); do not stack a
+second init inside the image. On the stage-2 candidate, `docker stop -t 10`
+with launcher init was measured below one second (exit 143). Without init, the
+Python server still handled SIGTERM as PID 1 in the local fixture, but returned
+a different exit code. The init requirement is retained for one-owner lifecycle
+and predictable signal semantics; it is not evidence that this image hangs
+without init. Standard container profile: non-root UID 65532, read-only root,
+network disabled unless explicitly required, dropped capabilities and
+`no-new-privileges`.
 
 ---
 

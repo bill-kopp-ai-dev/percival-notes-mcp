@@ -53,8 +53,16 @@ RUN printf 'deb [check-valid-until=no] http://snapshot.debian.org/archive/debian
     && rm -rf /usr/local/lib/python3.12/site-packages/pip \
         /usr/local/lib/python3.12/site-packages/pip-*.dist-info \
         /usr/local/lib/python3.12/ensurepip/_bundled \
-    && chmod u-s /usr/bin/mount \
     && rm -f /usr/bin/nsenter /usr/bin/infocmp \
+    && rm -f /usr/bin/apt /usr/bin/apt-cache /usr/bin/apt-cdrom /usr/bin/apt-config \
+        /usr/bin/apt-get /usr/bin/apt-mark /usr/bin/apt-key \
+        /usr/bin/dpkg /usr/bin/dpkg-deb /usr/bin/dpkg-divert /usr/bin/dpkg-maintscript-helper \
+        /usr/bin/dpkg-query /usr/bin/dpkg-realpath /usr/bin/dpkg-split \
+        /usr/bin/dpkg-statoverride /usr/bin/dpkg-trigger \
+    && rm -rf /usr/lib/apt /usr/lib/dpkg/methods /var/lib/apt /etc/apt \
+    && chmod u-s,g-s /usr/bin/mount /usr/bin/chage /usr/bin/chfn /usr/bin/chsh \
+        /usr/bin/gpasswd /usr/bin/passwd /usr/bin/su /usr/bin/umount \
+        /usr/sbin/unix_chkpwd \
     && rm -rf /var/lib/apt/lists/* \
     && mkdir -p /vault /app \
     && chmod 0755 /app \

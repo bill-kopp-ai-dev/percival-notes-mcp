@@ -82,9 +82,9 @@ async def test_read_multiple(notes_dir):
     mcp = create_mcp(notes_dir)
     result = await mcp.call_tool("notes_read_multiple", {"paths": ["note1.md", "note2.md"]})
     results = _extract_tool_result(result)
-    assert len(results) == 2
-    assert "note1.md" in results
-    assert "note2.md" in results
+    assert set(results["notes"]) == {"note1.md", "note2.md"}
+    assert results["omitted"] == []
+    assert "Link to [[note2]]" in results["notes"]["note1.md"]
 
 @pytest.mark.asyncio
 async def test_get_stats(notes_dir):

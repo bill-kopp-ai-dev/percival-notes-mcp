@@ -220,8 +220,8 @@ def test_rg_limits_empty_vault_and_symlinks(tmp_path):
     outside = tmp_path.parent / "outside-search.md"
     outside.write_text("---\ntype: Note\n---\n")
     (tmp_path / "escape.md").symlink_to(outside)
-    with pytest.raises(ValueError, match="escapes root"):
-        notes_mcp._search_notes_rg(**args, limits=limits)
+    # An external symlink is skipped, never fatal: the valid notes still match.
+    assert notes_mcp._search_notes_rg(**args, limits=limits) == ["a.md", "b.md"]
 
 
 def test_rg_rejects_errors_unbounded_output_and_timeouts(tmp_path):
