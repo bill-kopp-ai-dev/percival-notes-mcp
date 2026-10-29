@@ -3,6 +3,14 @@
 Project-scoped instructions for the Notes MCP server. Read `README.md` and
 `docs/` for its current tool contract and vault format.
 
+## Company approval
+
+This project belongs to Positronic Bean Labs (PBLabs), owned by Bill Kopp.
+Bill is the sole final decision-maker for decisions requiring owner or company
+approval. Technical review, implementation, and routine operations may be
+delegated without transferring final approval authority. This does not alter
+runtime access or authorize publication, deployment, or production changes.
+
 ## Docker and operations
 
 - This server is stdio-only. Keep stdout exclusively JSON-RPC; do not add TTY,
