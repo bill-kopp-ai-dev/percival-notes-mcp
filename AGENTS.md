@@ -3,13 +3,20 @@
 Project-scoped instructions for the Notes MCP server. Read `README.md` and
 `docs/` for its current tool contract and vault format.
 
-## Company approval
+## Ownership and approvals
 
-This project belongs to Positronic Bean Labs (PBLabs), owned by Bill Kopp.
-Bill is the sole final decision-maker for decisions requiring owner or company
-approval. Technical review, implementation, and routine operations may be
-delegated without transferring final approval authority. This does not alter
-runtime access or authorize publication, deployment, or production changes.
+This application is being built for Positronic Bean Labs
+(https://labs.positronicbean.com). Bill Kopp (bill.kopp.dev@gmail.com) is the
+sole owner of this application and its IaC infrastructure, the only project
+contributor, and the only decision-maker and signatory.
+
+Proceed with requested code, documentation, and local fixture work without
+seeking duplicate approvals or repeated acceptance from another party. Record
+an owner decision once and apply it consistently; repeat a check only when it
+covers a distinct risk, changed artifact, or new target environment. Ask Bill
+only when intent is materially ambiguous or an action has an external or
+production consequence not already authorized. This authority does not itself
+authorize publication, deployment, or production changes.
 
 ## Docker and operations
 
@@ -28,5 +35,8 @@ runtime access or authorize publication, deployment, or production changes.
 ## Verification
 
 - Canonical suite: `uv run pytest -q`.
+- Run focused tests when they cover a distinct regression or risk; avoid
+  duplicating the same assertion in multiple checklists, reports, or approval
+  steps. Reuse valid evidence for the same revision and environment.
 - Docker recipe: inspect `docker-compose.yml`; keep the Notes vault as the only
   writable persistent mount. Never run cleanup against user data.
