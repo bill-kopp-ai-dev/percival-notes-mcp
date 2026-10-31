@@ -9,8 +9,10 @@ the container identity (65532:65532).
 from __future__ import annotations
 
 import os
+import re
 import shutil
 import subprocess
+from datetime import datetime, timezone
 from pathlib import Path
 
 import pytest
@@ -23,7 +25,9 @@ RUNTIME_GID = 65532
 BASE_IMAGE = (
     "debian:forky-slim@sha256:4cee6ff3ebc49e32d55a857e25164ef8e5f8fecff2a186c6393f7e8bd8c23b53"
 )
-PRODUCT_IMAGE = "percival-notes-mcp:stage2-candidate"
+PRODUCT_IMAGE = os.environ.get(
+    "NOTES_MCP_TEST_IMAGE", "percival-notes-mcp:stage2-candidate"
+)
 
 pytestmark = pytest.mark.skipif(
     not shutil.which("docker"), reason="requires a docker daemon for the root-only steps"
@@ -57,6 +61,7 @@ def synthetic_vault(tmp_path: Path):
     (vault / "note.md").write_text(
         "---\ntype: Reference\ntags: [demo]\n---\n# Note\nbody\n", encoding="utf-8"
     )
+    (vault / "note.md").chmod(0o600)
     (vault / "sub" / "other.md").write_text(
         "---\ntype: Playbook\n---\n# Other\n", encoding="utf-8"
     )
@@ -133,6 +138,7 @@ def test_restore_without_owner_preservation_is_rejected(synthetic_vault: Path) -
 
 def test_backup_keeps_the_documented_retention(synthetic_vault: Path) -> None:
     """Seven daily plus four weekly snapshots survive; older copies are pruned."""
+    started_utc = datetime.now(timezone.utc)
     backups = synthetic_vault / "backups"
     backups.mkdir()
     stamps = [
@@ -158,7 +164,12 @@ def test_backup_keeps_the_documented_retention(synthetic_vault: Path) -> None:
     remaining = sorted(path.name for path in backups.glob("*.tar"))
     assert len(remaining) <= 7 + 4 + 1
     assert len(remaining) >= 7
-    assert remaining[-1].startswith("20261028T")
+    latest = max(remaining)
+    assert re.fullmatch(r"\d{8}T\d{6}Z-stage2\.tar", latest)
+    valid_dates = {
+        started_utc.strftime("%Y%m%d"), datetime.now(timezone.utc).strftime("%Y%m%d")
+    }
+    assert latest[:8] in valid_dates
 
 
 @pytest.mark.asyncio

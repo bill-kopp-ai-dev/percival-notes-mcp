@@ -1,7 +1,7 @@
 # Stage-2 — Remediação do Percival Notes MCP
 
-**Data / revisão:** 2026-10-30 / 1.5.
-**ID / estado:** S2-NT / implementação local majoritariamente presente; requalificação com 2 falhas de teste abertas; 10 ações ativas.
+**Data / revisão:** 2026-10-31 / 1.7.
+**ID / estado:** S2-NT / 10/10 ações locais mantidas concluídas/aceitas; smoke funcional pontual no agente Percival passou com a imagem `c1f367…`; qualificação ampla de V-PILOT/runtime e publicação não declaradas.
 **Checkout executor:** `/home/bill/Projects/percival-notes-mcp`.  
 **Owner e signatário único:** Bill Kopp (`bill.kopp.dev@gmail.com`), responsável único pelo Notes MCP e pela infraestrutura IaC da Positronic Bean Labs (`https://labs.positronicbean.com`); único colaborador destes projetos.
 
@@ -10,9 +10,12 @@
 Tratar os 16 achados da **seção 6** do
 [relatório Notes](../../../positronic-bean-IaC/docs/reports/2026-10-27-percival-notes-mcp-iac-readiness-report.md#6-achados-issues-e-inconsistências),
 com seções 7/9 como complemento. O relatório de origem tinha 12 ações (2 P1,
-6 P2, 4 P3), sem P0; esta revisão mantém 10 ações ativas.
+6 P2, 4 P3), sem P0; duas ações foram retiradas por decisão do owner e as 10
+ações mantidas foram concluídas no escopo local aprovado.
 Snapshot do relatório de origem: `83980418b3239be5476f6d347ceb8dad32d90e8e`.
-Checkout confrontado nesta revisão: `06059988367419c144535898bf0ac6ddfc173eb3`.
+Checkout de código qualificado: `5d761f747e4492dcca61c33a1a5880822b666233`.
+O checkout `06059988367419c144535898bf0ac6ddfc173eb3` é a base da revisão
+documental anterior e do resultado inicial de testes registrado na seção 6.
 O estado preexistente `D docs/search-benchmark.md` foi preservado; o arquivo não
 foi restaurado nem editado nesta revisão. A nota F3 local continua sendo evidência
 histórica específica do candidato identificado nela, não evidência de um candidato
@@ -23,12 +26,12 @@ atual.
 [consolidação](../../../positronic-bean-IaC/docs/reports/2026-10-26-stage-1-consolidated-readiness-report.md)
 e [D-01..D-06](../../../positronic-bean-IaC/docs/decisions/2026-10-27-iac-stage-1-scope-and-pilot-decisions.md).
 
-Emissão documental e execução técnica local no checkout dono. Operações em runtime
-gerenciado e qualificação de piloto não fazem parte do escopo vigente deste plano.
-Notes permanece o servidor previsto para o par piloto Percival + Notes (D-01), mas
-este plano não homologa runtime nem autoriza mexer no vault do operador. Preservar
-contrato das tools, OKF, busca ripgrep/fallback, containment e envelopes de conteúdo
-não confiável.
+O escopo original cobre emissão documental e execução técnica local no checkout
+dono. Após seu encerramento, Bill solicitou um smoke funcional pontual do Notes
+no agente Percival, registrado nas seções 2.4, 5.1 e 6.1. Esse resultado não
+homologa runtime amplo, não autoriza mexer em vault real nem amplia o escopo para
+publicação. Preservar contrato das tools, OKF, busca ripgrep/fallback, containment
+e envelopes de conteúdo não confiável.
 
 ## 2. Preparação e decisões
 
@@ -42,10 +45,11 @@ não confiável.
   image ID. A evidência local
   existente é histórica; novos candidatos exigem novo scan. Scan não aprova
   publicação ou VEX, que segue `R-07`.
-- [x] Cruzamento de código desta revisão (2026-10-30): os handlers, scripts,
+- [x] Cruzamento de código desta revisão (2026-10-31): os handlers, scripts,
   contratos Docker e testes foram inspecionados no checkout acima. A suíte
-  canônica foi executada; seus resultados e as duas falhas estão registrados nas
-  seções 5 e 6. Não foram alterados código, imagens, runtime gerenciado ou vault.
+  canônica foi executada; a requalificação histórica e a rechecagem desta revisão
+  estão registradas nas seções 5 e 6. Não foram alterados código, imagens, runtime
+  gerenciado ou vault.
 
 ### 2.1. Decisões do owner — Bill Kopp, 2026-10-29
 
@@ -86,37 +90,64 @@ Efeito vinculante para este plano:
 - Esta simplificação não autoriza ações em produção, publicação de imagem, nem
   uso do vault real em ensaios.
 
-## 3. Backlog ativo e aceite
+### 2.3. Decisões do owner — Bill Kopp, 2026-10-31
+
+| Item | Decisão | Efeito no plano |
+|---|---|---|
+| Retorno ao coordenador IaC | Atualizar somente a linha S2-NT da seção 3 e o retorno S2-NT da seção 7 do coordenador; preservar os demais retornos e registrar contagem/status, SHAs e limites da evidência local. Não reabrir aprovações já concedidas. | Sincronização documental concluída neste retorno; outras seções do coordenador não foram alteradas. |
+| Encerramento local S2-NT | Encerrar as ações locais com escopo explícito: candidato e scan valem somente para o image ID registrado; runtime gerenciado, piloto e publicação não foram qualificados. Registrar 64 passed/4 skipped como rechecagem do código, não da imagem. | 10/10 ações mantidas encerradas ou aceitas localmente. A-003/A-006 permanecem retiradas. V-PILOT não bloqueia o encerramento local. |
+| V-PILOT futuro | Antes de eventual execução, confirmar pin e versão do manager, identificar fixture isolada e verificar que não existe bind para vault real; executar prompts pelo loop do agente e registrar resultado sem tratar smoke MCPProvider como substituto. | Orientação para eventual trabalho futuro; sem execução nem pendência de aceite nesta etapa. |
+| Distribuição e revisão de licenças | Distribuição via Docker Hub será implementada somente no futuro; remover revisão de licenças como item/pendência deste plano. | Nenhuma distribuição ou revisão de licenças integra o escopo ou bloqueia o encerramento local. |
+
+### 2.4. Decisão e teste pontual no agente Percival — 2026-10-31
+
+Após o encerramento local S2-NT, Bill solicitou preparar e testar a imagem Notes
+no agente Percival. O owner aplicou a pinagem pela interface do manager; as
+capturas compartilhadas mostram a transição do pin `sha256:ef4082ef…` para
+`sha256:c1f36791…` e o estado final `running`/`MCP connected`, com 12 tools
+observadas. A execução usou uma nota sintética única e a removeu ao final.
+
+Este é um smoke pós-encerramento, restrito ao image ID, à configuração observada
+e às operações relatadas. Não reabre as 10 ações locais nem autoriza publicação,
+produção, uso de vault real ou qualificação ampla de V-PILOT. Esta decisão
+posterior atualiza o estado somente quanto ao smoke pontual; a linha 2.3 registra
+corretamente que ainda não havia execução quando o encerramento local foi decidido.
+
+## 3. Ações mantidas no escopo e aceite
 
 Por decisão do owner registrada na seção 2.1, duas ações de origem foram retiradas;
-a tabela contém as 10 ações ativas. Os IDs originais das ações mantidas foram
-preservados. O estado histórico e a contagem vigente estão na seção 6.
+a tabela contém as 10 ações mantidas no escopo. Os IDs originais foram preservados.
+As ações locais foram encerradas com os limites de evidência e exclusões descritos
+neste plano; o registro histórico e a contagem final estão na seção 6.
 
 | Ação | Achados / P | Trabalho e áreas previstas | Dependência / execução | Aceite verificável | Estado confrontado com o checkout |
 |---|---|---|---|---|
 | A-001 | F-001 / P1 | Tornar busca resiliente a symlink externo nos caminhos ripgrep e fallback em `notes_mcp.py` | Sem dependência externa | Arquivo fora do vault ignorado com aviso sanitizado; notas válidas encontradas; nenhum conteúdo/path externo exposto; testar ambos os caminhos | Implementado; `tests/test_stage2_remediation.py` chama os caminhos rg e walker e verifica aviso sanitizado; suíte atual passou nesses casos. |
-| A-002 | F-002 / P1 | Publicar backup/restore preservando owner numérico/permissões e exigindo leitura após restore | Decisão do owner sobre cópias/retenção | Restore em fixture com manifesto SHA-256 igual, UID/GID compatíveis (baseline UID 65532, confirmar candidato), leitura/busca/escrita funcionais; negativo de owner errado explícito | Scripts e testes existem. Requalificação atual parcial: o verificador rejeitou owners incorretos, mas duas asserções da suíte falharam; ver seção 6. |
+| A-002 | F-002 / P1 | Publicar backup/restore preservando owner numérico/permissões e exigindo leitura após restore | Decisão do owner sobre cópias/retenção | Restore em fixture com manifesto SHA-256 igual, UID/GID compatíveis (baseline UID 65532, confirmar candidato), leitura/busca/escrita funcionais; negativo de owner errado explícito | Scripts e testes existem; as duas asserções foram corrigidas nos testes e a requalificação de 2026-10-30 registrou 68 passed. Rechecagem 2026-10-31: 64 passed, 4 skipped por dependência de Docker/imagem; ver seção 6. |
 | A-004 | F-004 / P2 | Declarar init único requerido ou embutir init com decisão compatível; registrar contrato de implantação | S2-C01 aprovado por Bill; launchers | `docker stop` em menos de 1 s na fixture; sem init duplo; ausência de init recusada/documentada conforme decisão | Contrato implementado em Dockerfile/Compose/README; testes estáticos e de lifecycle passaram na suíte atual. Medições detalhadas disponíveis são históricas (2026-10-28), não repetidas nesta revisão. |
 | A-005 | F-005 / P2 | Normalizar build ou declarar/medir limitação de reprodutibilidade com decisão do owner | Limitação aceita por Bill e diferenças já medidas | Aceite satisfeito: diferenças registradas e limitação aceita; promoção/publicação não é gate desta etapa | Aceite do owner e comparação histórica registrados; não foi reconstruído um par de imagens nesta revisão. |
-| A-007 | F-007 / P2 | Rescan local do candidato com Trivy (`R-11`) e registrar o resultado; produzir VEX conforme `R-07` se houver CVEs | Agente pode executar scan local autonomamente; candidato identificado | Scan com versão/data da DB, SHA/image ID identificados e resultado registrado; sem VEX se o scan estiver limpo. Gates de tracker, distribuição e publicação não pertencem a esta etapa | Pendente nesta revisão: o resultado F3 refere-se ao image ID histórico de 2026-10-28; não foi identificado nem escaneado candidato atual. |
+| A-007 | F-007 / P2 | Rescan local do candidato com Trivy (`R-11`) e registrar o resultado; produzir VEX conforme `R-07` se houver CVEs | Agente pode executar scan local autonomamente; candidato identificado | Scan com versão/data da DB, SHA/image ID identificados e resultado registrado; sem VEX se o scan estiver limpo. Gates de tracker, distribuição e publicação não pertencem a esta etapa | Scan local registrado para o candidato exato `1572c6b…` (seção 5); 0 CVEs, sem VEX requerido por `R-07`. Evidência vinculada somente a esse image ID, sem promoção/publicação. |
 | A-008 | F-008, F-015 / P2 | Expor leituras parciais em stats/read_multiple com motivo de omitidos, sem vazamento de path externo | Compatibilidade do contrato de resposta com consumidores | Fixture com arquivo ilegível distinguida de vault vazio; notas lidas preservadas, omitidos/motivos explícitos; envelope e controle de path mantidos | Implementado; teste de stats/read_multiple passou na suíte atual, inclusive motivos e envelope. |
 | A-009 | F-009 / P3 | Validar glob antes da enumeração e sanitizar aviso | Sem dependência externa | `../../*` e padrão absoluto recusados antes de varrer; sem resultado espúrio `.` nem caminhos externos nos logs | Implementado antes de `root_dir.glob`; testes de padrões relativos inválidos e logs sanitizados passaram. |
 | A-010 | F-010, F-011 / P3 | Remover raiz interna do status e retirar paths de notas de INFO | Política de privacidade do produto | Status sem path absoluto; logs operacionais sem nome/caminho sensível; DEBUG privado apenas se explicitamente configurado | Implementado; testes de status, logs INFO sem paths e DEBUG opt-in passaram. |
 | A-011 | F-012, F-013 / P3 | Tolerar quebra final/CRLF no frontmatter e derivar versão do pacote no serverInfo | Contrato OKF preservado | Frontmatter válido aceito e persistido corretamente; initialize informa versão do produto (0.1.5 só se vigente), não do SDK | Implementado e testado; `pyproject.toml` declara 0.1.5 e initialize usa a versão do produto. |
-| A-012 | F-014, F-016 / P3 | Corrigir README do ripgrep/restore e remover apt/setuid residuais não usados | A-002; compatibilidade da imagem | Docs conferem com versão embarcada; inventário limpo sem eliminar dependência necessária; smoke/protocolo/busca permanecem verdes | README, scripts e receita Docker refletem `rg` 15.2.0, restore e remoção de apt/dpkg/setuid; suíte atual passou fora das duas falhas de A-002. Inventário citado pela nota F3 segue específico à imagem histórica. |
+| A-012 | F-014, F-016 / P3 | Corrigir README do ripgrep/restore e remover apt/setuid residuais não usados | A-002; compatibilidade da imagem | Docs conferem com versão embarcada; inventário limpo sem eliminar dependência necessária; smoke/protocolo/busca permanecem verdes | README, scripts e receita Docker refletem `rg` 15.2.0, restore e remoção de apt/dpkg/setuid; verificações locais aplicáveis passaram. Inventário citado pela nota F3 segue específico à imagem histórica. |
 
 ## 4. Sequência e dependências
 
-1. **NT-1:** A-001 implementada e verificada. A-002 tem scripts e evidência
-   histórica, mas a requalificação atual ainda não satisfaz todos os testes;
-   manter aberta até corrigir as duas asserções e repetir os testes em fixture.
-   Nenhum ensaio usa runtime gerenciado ou vault real.
-2. **NT-2:** A-008/A-009/A-010/A-011 implementadas e cobertas por testes;
-   A-004 tem contrato aprovado e testes atuais verdes; A-012 está refletida no
-   README e nos scripts. Revisar a documentação após fechar A-002.
-3. **NT-3:** A-005 aceita com a limitação medida; A-007 aguarda candidato atual
-   e novo scan local. Bill implementa S2-C04 e comprova o reuso do harness nos
-   dois MCPs previstos.
+1. **NT-1 concluída:** A-001 verificada; A-002 encerrada com a requalificação
+   em fixture de 2026-10-30 (68 passed). Os casos Docker foram ignorados na
+   rechecagem de código de 2026-10-31, que não substitui nem invalida aquela
+   evidência. Nenhum ensaio usa runtime gerenciado ou vault real.
+2. **NT-2 concluída:** A-008/A-009/A-010/A-011 implementadas e cobertas por testes;
+   A-004 tem contrato aprovado e verificações locais registradas; A-012 está
+   refletida no README e nos scripts; documentação revisada junto ao encerramento
+   local de A-002.
+3. **NT-3 concluída no escopo local:** A-005 aceita com a limitação medida; A-007 foi escaneada para o
+   candidato local identificado na seção 5, e o resultado não vale para outra
+   imagem. S2-C04 e `V-REUSE` foram demonstrados em Notes e Weather. V-PILOT,
+   que requer execução no loop de agente, está fora do escopo desta etapa
+   conforme a seção 1 e não bloqueia as ações locais.
 
 Riscos distintos: skip silencioso pode ocultar falha, nova resposta parcial pode
 quebrar cliente e restore com UID errado pode parecer perda de tags. Cobrir cada
@@ -124,37 +155,76 @@ risco com a verificação direcionada já prevista; não duplicar evidências ne
 fazer chown/cópia no vault real.
 `R-03` remove a exigência de estimar esforço, custo ou prazo.
 
-## 5. Qualificação futura no projeto
+## 5. Qualificação local registrada no projeto
 
-- [!] Reexecutado `uv run pytest -q` em 2026-10-30 no checkout
-  `06059988367419c144535898bf0ac6ddfc173eb3`: 66 passed, 2 failed em 50,11 s.
-  Ambas as falhas são de `tests/test_vault_backup_restore.py` e estão detalhadas
-  na seção 6; portanto a qualificação integral não está verde. Não introduzir
-  lint/cobertura como requisito novo sem decisão do produto.
-- [x] Build identificado e smoke MCP stdio, init único, stdout JSON-RPC-only;
-  write/read/search em fixture OKF com ripgrep e fallback aplicáveis (evidência
-  histórica de 2026-10-28; não repetida nesta revisão).
-- [x] A suíte atual exercitou contenção/glob/symlinks, frontmatter,
-  stats/leituras parciais, logs e lifecycle; casos correspondentes passaram.
-- [!] Backup/restore foi exercitado em fixture sintética, mas 2 asserções
-  falharam. A verificação de owner incorreto detectou mismatch; porém, o arquivo
-  da fixture tem permissão de leitura para outros usuários, então a leitura por
-  UID 65532 não prova que o restore com owner incorreto ficou inacessível. O
-  teste de retenção esperava literalmente `20261028T`, embora a execução de
-  2026-10-30 tenha criado `20261030T`. Corrigir a qualificação e repetir, sem
-  ampliar o escopo para vault real.
-- [ ] Após corrigir as duas asserções abertas de A-002, executar uma única
-  qualificação local consolidada: `uv run pytest -q`; se a mudança afetar a
-  imagem, construir uma vez e executar um smoke MCP stdio em fixture sintética
-  para startup, configuração, bind, protocolo e funções (`V-BUILD` a `V-FUNC`).
-  Registrar um resumo único do resultado, sem aceite separado por dimensão.
-- [ ] Para S2-C04, verificar uma vez o reuso do harness nos dois MCPs previstos
-  junto da qualificação consolidada (`V-REUSE`); não abrir aceite, relatório ou
-  checklist separado para cada `V-*`.
+- [x] Reexecutada a suíte após corrigir as duas asserções de A-002: permissão
+  `0600` no arquivo sintético torna o teste de owner incorreto discriminante; a
+  retenção agora valida timestamp UTC gerado na execução, não uma data fixa.
+  Na requalificação de 2026-10-30, `.venv/bin/python -m pytest -q` teve **68 passed**.
+  Rechecagem do código no SHA `5d761f7` em 2026-10-31 com
+  `.venv/bin/python -m pytest -q`:
+  **64 passed, 4 skipped** (casos dependentes de Docker/imagem local ignorados
+  neste ambiente); este resultado não requalifica a imagem nem runtime.
+- [x] Construído o candidato local exato `percival-notes-mcp:stage2-vpilot-5d761f7`
+  do SHA `5d761f747e4492dcca61c33a1a5880822b666233`, versão `0.1.5`,
+  `linux/amd64`, UID/GID `65532:65532`, image ID local
+  `sha256:1572c6b291afe67e3f77ac10840cd8d51227389ffc830e8122afd44e85ed6e0d`.
+  O candidato não foi publicado.
+- [x] Qualificação da imagem exata: `tests/smoke_stdio.py --docker-image
+  percival-notes-mcp:stage2-vpilot-5d761f7` passou em fixture sintética; 12 tools,
+  resource e prompts, read/write/search, negativas de path e persistência após
+  recriação. `scripts/docker-ci-conformance.py` também passou `initialize` e
+  `tools/list`; `docker compose config --quiet` passou.
+- [x] Trivy 0.76.1, DB `UpdatedAt=2026-10-30T13:06:28Z`: 0 vulnerabilidades,
+  0 misconfigurações e 0 secrets no candidato exato. JSON canônico:
+  `docs/issues/2026-10-30-notes-5d761f7-1572c6b-scan.json`. A evidência vale
+  somente para esse candidato e não qualifica distribuição.
+- [x] V-REUSE: harness comum `pblabs-mcp-stdio/v1`, fonte em
+  `../../../positronic-bean-IaC/scripts/mcp_stdio_conformance.py`, SHA-256
+  `299b1595e9281ad23b2a9e4547612154a1cf52e43bdf3776a3631b21a07319be`, passou
+  nos candidatos Notes e Weather (identidades/versões/tools conferidas). O
+  Weather comparado foi `sha256:821ea0f6761f7cd3d98f5737afc4753060a5eeb87e335aeaf2be23c50d007a58`,
+  revision `ed2caa8c`; o código/Dockerfile do produto não diferem até o checkout
+  atual, embora a imagem permaneça local e não publicada.
+- [x] Preparação de integração V-PILOT: Bill autorizou o smoke DinD isolado com
+  o par Percival/Notes exato; o harness gerente/MCPProvider passou. A evidência
+  valida a ponte local, não a interação em linguagem natural.
+- [x] Disposição V-PILOT no encerramento local: ainda não qualificado e fora do
+  escopo. A tentativa E25 foi inconclusiva: o manager observou outro pin/versão
+  e o vault sintético não foi confirmado; nenhuma escrita ocorreu. O smoke
+  pontual posterior, solicitado por Bill e executado no agente Percival em
+  2026-10-31, está registrado na seção 5.1; não equivale à qualificação ampla
+  nem autoriza runtime persistente/publicação.
 
 Esta qualificação cobre o produto e fixtures locais. Não conclui nem declara estado
-de runtime gerenciado, piloto ou causa de eventos operacionais. Publicação e
-distribuição da imagem também estão fora do escopo desta etapa.
+de runtime gerenciado amplo ou causa de eventos operacionais. O smoke pontual no
+agente Percival após o encerramento está delimitado na seção 5.1; publicação e
+distribuição da imagem continuam fora do escopo.
+
+### 5.1. Smoke funcional pontual no agente Percival — 2026-10-31
+
+- **Pin observado nas capturas do manager:** estado inicial
+  `sha256:ef4082ef13905cdaa0da23830bcc6c5b88ca3beb30074e11d56593d11a097460`;
+  estado final `sha256:c1f36791f649c50c74c7f90e02708d1f415b114500bcfcfc5bb0626a2a6ac050`.
+  O MCP não expõe a identidade da imagem; essa identidade vem da captura do
+  manager, não de `notes_get_status`.
+- **Estado final mostrado:** Docker `running`, MCP `connected`, gateway intent
+  `running`, enabled, 12 tools observadas. `notes_get_status` retornou servidor
+  operational, versão `0.1.5`, root reportado como `vault` (sem path absoluto).
+- **Sequência relatada por Bill como executada pelo agente:** pré-checagem do
+  caminho único com `notes_glob`; `notes_write`; `notes_read` confirmou marcador
+  e envelope; `notes_search(in_markdown=true)` encontrou somente o caminho
+  sintético; `notes_rm`; pós-checagem `notes_glob` e `notes_search` vazias.
+- **Fixture sintética:** `_percival_smoke_20261031T210815_7f3a9c.md`, marcador
+  `PERCIVAL_NOTES_SMOKE_20261031T210815_7f3a9c`. O relatório do agente não aponta
+  falhas e confirma que apenas essa nota foi escrita/removida; nenhum conteúdo de
+  outras notas foi lido, listado ou exportado.
+- **Veredito limitado:** smoke de integração pelo agente passou para o pin
+  mostrado. A versão do servidor, isoladamente, não comprova image ID; o pin é
+  sustentado pela captura do manager. Evidência de execução é o relatório
+  compartilhado por Bill, não há trace bruto anexado. O resultado não declara
+  qualificação ampla de runtime/piloto, persistência operacional, uso de vault
+  real ou publicação.
 
 ## 6. Penúltima etapa — documentar execução neste plano
 
@@ -173,14 +243,14 @@ distribuição da imagem também estão fora do escopo desta etapa.
 | 2026-10-29 / Bill Kopp (owner único) | S2-C01/S2-C02 aprovados; S2-C04 aceito, implementação atribuída a Bill; publicação/registry/manifests/índice e gates de distribuição fora do escopo. A-005 aceita com diferenças medidas. A-003/A-006 retiradas do escopo ativo por decisão do owner. | Sem alteração do candidato. | A-003/A-006 não são executadas nem avaliadas neste plano. Artefatos brutos históricos não anexados/referenciados. | Prosseguir com as 10 ações restantes, S2-C04 e `V-*` locais. Este plano não declara runtime/piloto qualificado nem causa do `exit 255`. |
 | 2026-10-30 / Bill Kopp (owner e signatário únicos) | Decisão de governança enxuta registrada na seção 2.2. | Sem alteração do candidato. | Uma qualificação consolidada substitui aceites/checklists redundantes; os riscos distintos de restore e scan continuam cobertos. | Aplicar este modelo às ações restantes, sem ampliar autorização de produção/publicação nem usar vault real em ensaios. |
 
-**Contagem vigente:** 10 ações permanecem ativas; a contagem não significa que
-10/10 estejam aceitas. A-001, A-004 e A-008–A-012 têm implementação local
-confirmada no código e testes relevantes verdes nesta execução; A-005 tem aceite
-decisório histórico. A-002 requer corrigir/repetir dois testes, A-007 requer scan
-de candidato atual e S2-C04/`V-REUSE` continua pendente. A-003 e A-006 foram
-retiradas e não entram no denominador. O registro histórico de 2026-10-28 acima
-e a contagem **9 verificadas, 2 parciais e 1 aberta** do relatório daquela data
-são históricos.
+**Contagem final do escopo local:** 10/10 ações mantidas concluídas ou aceitas:
+A-001, A-002, A-004, A-007–A-012 verificadas localmente; A-005 aceita pelo owner.
+O scan A-007 cobre somente o candidato exato `1572c6b…`, sem CVEs; V-REUSE/S2-C04
+foi demonstrado em Notes e Weather. A-003 e A-006 foram retiradas por Bill e não
+entram no denominador. Na data desse encerramento, V-PILOT amplo, runtime gerenciado
+e publicação não foram qualificados; o smoke pontual posterior está registrado
+na seção 5.1 e não altera a contagem local. A distribuição via Docker Hub e
+qualquer revisão associada ficam para trabalho futuro, fora deste plano.
 
 ### 6.1. Trilha e limites das evidências
 
@@ -192,7 +262,46 @@ são históricos.
 | Builds `--no-cache` e comparação de rootfs | IDs e diferenças resumidos no retorno acima | Manifestos/saída da comparação não foram localizados nos artefatos versionados consultados |
 | Restore e lifecycle em fixture | Resultado resumido no retorno acima | Manifestos SHA-256 e logs/JSON das execuções do candidato não foram anexados/referenciados |
 | Diagnóstico inicial (snapshot `83980418…`) | [Índice das evidências originais](../../../positronic-bean-IaC/docs/reports/evidence/percival-notes-mcp/83980418b323/README.md) | Evidência do snapshot inicial, não substitui artefatos do candidato `fbf1a291…` |
-| Suíte e cruzamento de código (2026-10-30; checkout `0605998…`) | Execução local de `uv run pytest -q`: 66 passed, 2 failed; inspeção dos handlers em `notes_mcp.py`, scripts de backup/restore, Dockerfile, Compose e testes A-001/A-004/A-008–A-012 | `test_restore_without_owner_preservation_is_rejected` rejeitou corretamente owners incorretos, mas `PROBE_EXIT=1` falhou: o arquivo de fixture permite leitura por outros usuários, então UID 65532 ainda pode lê-lo mesmo com owner errado. A asserção não comprova inacessibilidade. `test_backup_keeps_the_documented_retention` falhou por data fixa `20261028T`; a execução criou snapshot `20261030T`. Nenhum arquivo de código foi alterado nesta revisão. |
+| Suíte inicial (2026-10-30; checkout `0605998…`) | `66 passed, 2 failed`; investigação em `tests/test_vault_backup_restore.py` | Resultado histórico substituído pela requalificação abaixo: uma permissão de fixture tornava o negativo de owner não discriminante e outra asserção fixava a data do snapshot. |
+| Requalificação (2026-10-30; source `5d761f747e4492dcca61c33a1a5880822b666233`) | Correções apenas nos testes; `.venv/bin/python -m pytest -q`: **68 passed**. Build exato `percival-notes-mcp:stage2-vpilot-5d761f7`, image ID `sha256:1572c6b291afe67e3f77ac10840cd8d51227389ffc830e8122afd44e85ed6e0d`; arquitetura `linux/amd64`, UID/GID `65532:65532`; smoke `tests/smoke_stdio.py` passou com tools/resources/prompts, operações em fixture sintética e persistência. Trivy 0.76.1, DB `2026-10-30T13:06:28Z`: 0 CVEs, 0 misconfigurações, 0 secrets; scan JSON em `docs/issues/2026-10-30-notes-5d761f7-1572c6b-scan.json`. | `V-BUILD`, `V-RUN`, `V-CONFIG`, `V-DATA`, `V-MCP` e `V-FUNC` locais aprovados somente para este image ID e fixtures. Não houve deploy, uso do vault real nem publicação. V-PILOT não foi qualificado e está fora do escopo desta etapa. |
+| Integração Percival+Notes em DinD (2026-10-30; autorização de Bill) | `scripts/percival-i2-runtime-smoke.py` com os image IDs exatos; Engine 27.5.1; resultado `completed=true`. | `/home/bill/.positronic/runtime/tmp/opencode/i2-u4m8rp3u/results.json`; MCP tools/resources/prompts, read/write, protected path, restart/recovery e cleanup passaram pelo manager/MCPProvider. | Fixture e vault sintéticos; nenhuma LLM prompt ou vault real. Isso é pré-prova de ponte/runtime para V-PILOT, não fecha o teste por prompts no agente. |
+| Smoke funcional no agente Percival (2026-10-31; relato e capturas compartilhados por Bill) | Pin observado na UI: `sha256:ef4082ef…` → `sha256:c1f36791…`; status final running/connected, 12 tools. O agente reportou status v0.1.5 e ciclo de nota sintética write/read/search/remove, seguido de glob/search vazios. | Caminho `_percival_smoke_20261031T210815_7f3a9c.md`; marcador `PERCIVAL_NOTES_SMOKE_20261031T210815_7f3a9c`; relatório e capturas fornecidos por Bill nesta conversa. | Evidência reportada pelo owner; MCP não identifica a imagem e não há trace bruto anexado. Smoke funcional de um caminho passou; não representa qualificação ampla de runtime/piloto. Nota sintética removida; nenhuma outra nota acessada. |
+
+### 6.2. Reconciliação dos gates V-* do candidato local
+
+| Gate | Estado neste candidato | Evidência e limite |
+|---|---|---|
+| `V-BUILD` | **aprovado localmente** | SHA/image ID, versão, plataforma, UID/GID e labels conferidos no build exato; não é `RepoDigest` publicado. |
+| `V-RUN` | **aprovado localmente** | Inicialização stdio, EOF/exit 0 e recriação exercitados em container sintético; não avalia runtime gerenciado. |
+| `V-CONFIG` | **aprovado localmente** | Requalificação de 2026-10-30: suíte 68/68 e smoke com rede desativada, user não-root, vault sintético e negativas previstas. Rechecagem 2026-10-31: 64 passed, 4 skipped por dependência de Docker/imagem, sem requalificar o candidato. |
+| `V-DATA` | **aprovado em fixture** | Backup/restore confere owner numérico, SHA/conteúdo e retenção; write/read permanece após recriação do container. Nenhum vault real foi lido ou alterado. |
+| `V-MCP` | **aprovado localmente** | `initialize`, `notifications/initialized`, `tools/list` (12 tools), resource read, prompts list/get; stdout somente JSON-RPC. |
+| `V-FUNC` | **aprovado em fixture** | `notes_write`, `notes_read`, `notes_search` e negativos de path/symlink exercitados na imagem exata; sem dados externos. |
+| `V-PILOT` | **smoke funcional pontual passou; qualificação ampla não declarada** | Após E25, Bill pinou `sha256:c1f367…` no Percival; capturas mostram `running`/`connected` e 12 tools. O agente executou status e ciclo write/read/search/remove de nota sintética, com pós-checagem vazia (seção 5.1). Image ID vem da captura, não da resposta MCP; o relato é do owner, sem trace bruto anexado. Isso cobre um caminho funcional no agente, não qualifica runtime amplo, vault real, publicação ou promoção. |
+| `V-REUSE` | **demonstrado localmente** | Harness comum versionado `pblabs-mcp-stdio/v1` (SHA-256 acima) passou em Notes e Weather; limita-se às probes MCP comuns, sem substituir testes funcionais específicos de cada produto. |
+
+### 6.3. Harmonização com IaC — 2026-10-31
+
+- A convenção de ownership `R-12` do coordenador IaC consolida Bill como owner
+  e decisor final, sem duplicar aprovações; gates técnicos e autorização para
+  runtime/publicação permanecem distintos.
+- `R-10` não amplia o perfil Notes: o bind explícito do vault continua estreito
+  e os dados existentes não são alterados implicitamente. O default amplo é
+  exclusivo do broker Percival.
+- O C02/D-05 comprovado é específico ao Percival e ao smoke DinD Percival+Notes.
+  A prova via manager/MCPProvider e o smoke funcional pontual do agente (seção
+  5.1) são evidências distintas. O novo teste exercitou um caminho sintético de
+  status/write/read/search/remove; não resolve todos os limites de E25 nem
+  autoriza runtime persistente ou publicação.
+- O harness comum `pblabs-mcp-stdio/v1` foi demonstrado em Notes e Weather para
+  identidade/versão, `initialize`, `tools/list`, stdout de protocolo, UID
+  opcional e encerramento. Isso não substitui a suíte Notes, os testes
+  funcionais, transporte HTTP ou `V-PILOT`.
+- A ação A-011 do plano IaC, sobre provenance, refere-se ao bootstrap Percival
+  e aos doubles/fixtures locais; bundle/release/atestação pública seguem
+  pendentes. O scan/VEX Notes
+  descrito aqui pertence somente ao image ID registrado; assinatura VEX por
+  CVE e promoção são gates próprios, sem promoção implícita deste candidato.
 
 ## 7. Última etapa — atualizar o plano coordenador
 
@@ -201,5 +310,6 @@ são históricos.
   SHA/evidências, aceites locais/externos e dependências liberadas para o piloto.
 - [x] Preservar outros retornos e informar efeito sobre M1/etapas 2/4/5; manter o
   coordenador parcial enquanto houver ações abertas ou gates não executados.
-- [ ] Sincronizar as decisões de Bill, incluindo a retirada de A-003/A-006, e a
-  exclusão de publicação do escopo no retorno S2-NT do plano coordenador.
+- [x] Sincronizar as decisões de Bill, incluindo a retirada de A-003/A-006, o
+  encerramento das ações locais e a exclusão de publicação do escopo, no retorno
+  S2-NT do plano coordenador.
