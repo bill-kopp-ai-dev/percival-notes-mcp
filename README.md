@@ -96,11 +96,12 @@ variables): read/write/search file size 1,000,000 bytes each (`MAX_READ_BYTES`,
 (`MAX_GLOB_RESULTS`), search files 5,000 (`MAX_SEARCH_FILES`), search matches
 1,000 (`MAX_SEARCH_MATCHES`) and operation timeout 20 seconds
 (`OPERATION_TIMEOUT_SECONDS`). Legacy `NOTES_MCP_<NAME>` variables are also
-accepted as fallbacks. Narrow the request if a limit is hit. See
-[the synthetic search characterization](docs/search-benchmark.md): parity was
-observed on that corpus, but the rg-backed wrapper was slower than the legacy
-walker there; no speedup is claimed. This historical document may be absent in
-some working checkouts.
+accepted as fallbacks. Narrow the request if a limit is hit. The synthetic
+search characterization of 2026-09-28 observed parity on that corpus, but the
+rg-backed wrapper was slower than the legacy walker there; no speedup is
+claimed. That historical document is not part of this tree, so the claim
+stands without a local reference; re-run `tests/benchmark_search.py` against a
+representative vault before making any performance statement.
 
 ### Vault backup and restore
 
