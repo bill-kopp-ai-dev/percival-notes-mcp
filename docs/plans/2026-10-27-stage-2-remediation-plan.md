@@ -197,6 +197,12 @@ fazer chown/cópia no vault real.
   log de build. O mesmo host executou scan e SBOM sem falha, então a causa é
   da fase de build e precisa ser vista no host. Sem candidato novo para
   `b0b25cf`, o scan vigente cobre a revisão `5d761f7`, não a árvore atual.
+  Diagnóstico de 2026-11-08: o executor descarta o stderr da fase de build e
+  resolve a receita (inclusive `network` e `rejectSeverities`) no carregamento
+  da policy, então a receita `canonical` deste projeto — registrada em
+  2026-11-07 e nunca usada para um build — precisa de correção no host e de
+  um restart do executor. Detalhes e experimento preparado em
+  `docs/issues/2026-11-08-notes-c1f36791-scan.md`.
 - [x] V-REUSE: harness comum `pblabs-mcp-stdio/v1`, fonte em
   `../../../positronic-bean-IaC/scripts/mcp_stdio_conformance.py`, SHA-256
   `299b1595e9281ad23b2a9e4547612154a1cf52e43bdf3776a3631b21a07319be`, passou
