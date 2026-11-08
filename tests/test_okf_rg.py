@@ -1,5 +1,6 @@
 import shutil
 import stat
+import sys
 import time
 from dataclasses import replace
 from pathlib import Path
@@ -226,7 +227,9 @@ def test_rg_limits_empty_vault_and_symlinks(tmp_path):
 
 def test_rg_rejects_errors_unbounded_output_and_timeouts(tmp_path):
     fake = tmp_path / "fake-rg"
-    fake.write_text("#!/usr/bin/env python3\nimport sys, time\n"
+    # Use the interpreter running the suite: `env python3` is not resolvable
+    # on every host, and a missing interpreter would fake a scanner failure.
+    fake.write_text(f"#!{sys.executable}\nimport sys, time\n"
                     "if '-e' in sys.argv:\n"
                     "  mode = sys.argv[sys.argv.index('-e') + 1]\n"
                     "  if mode == 'sleep': time.sleep(1)\n"

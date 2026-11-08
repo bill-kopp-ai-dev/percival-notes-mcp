@@ -37,6 +37,10 @@ pytestmark = pytest.mark.skipif(
 
 
 def _image_available() -> bool:
+    # Evaluated at import time: without the docker binary this must degrade to
+    # a skip, not raise FileNotFoundError and abort the whole collection.
+    if shutil.which("docker") is None:
+        return False
     probe = subprocess.run(
         ["docker", "image", "inspect", IMAGE],
         capture_output=True, text=True, timeout=60, check=False,
