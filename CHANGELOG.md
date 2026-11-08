@@ -10,5 +10,6 @@
 - Preserve 12 MCP tool names/signatures, raw read envelopes and existing status/stats shapes; resolve bundle-relative and source-relative Markdown links for backlinks.
 - Restore baseline tests by calling registered `notes_*` names; add parity tests, real stdio smoke and reproducible timing harness.
 - Review fixes: avoid backlink matches across homonymous directories; anchor file operations to vault directories to prevent symlink-swap redirects; preserve file permissions on replacement; reject non-finite timeouts; retain literal search for NUL queries via the bounded walker.
+- Documentation and contract guards: the README now states the ripgrep version the image installs (15.2.0) and declares that the image is not byte-reproducible, so a built image must be identified by image ID or digest. Static tests keep the README, the Dockerfile and the runtime contract in agreement, and the suite now degrades to skips — instead of aborting collection — on hosts without the `docker` binary.
 
 The operator confirmed on 2026-09-28 that there is no existing vault to preserve and Nanobot accepts the required `type`, reserved-file rules, relative Markdown backlinks and existing non-XML read envelope. Pending before release: an end-to-end run in Nanobot itself and release timing. No migration or release is performed here.

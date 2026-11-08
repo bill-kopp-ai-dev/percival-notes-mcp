@@ -149,6 +149,21 @@ without init. Standard container profile: non-root UID 65532, read-only root,
 network disabled unless explicitly required, dropped capabilities and
 `no-new-privileges`.
 
+### Build reproducibility
+
+The image is **not byte-reproducible**. Two `docker build --no-cache` runs of
+the same commit produce different image IDs: most layers differ only in
+embedded timestamps and build logs (`uv_cache.json` hashes, `RECORD` entries,
+apt/dpkg logs, `ldconfig` cache), while the dependency versions themselves
+stay identical. Measured on the stage-2 candidate (2026-10-28): 7 of 9 layers
+and 6 of 6,067 files diverged by content or hash, and 2,308 mtimes differed.
+The owner accepted this limitation on 2026-10-28.
+
+Practical consequence: identify a built image by its **image ID** (`docker image
+inspect <tag> --format '{{.Id}}'`) or by an OCI digest, never by the commit
+alone. A commit does not imply a single reproducible artifact; the digest is
+the only stable handle for promotion, pinning or rollback.
+
 ---
 
 ## ⚙️ Configuration in percival.OS (Nanobot)
@@ -214,7 +229,7 @@ docker image inspect percival-notes-mcp:docker-test --format '{{.Id}}'
 ```
 
 The image installs the project from `uv.lock` (without dev dependencies) and
-Debian's `ripgrep` 13.0.0, and starts MCP over stdio. It accepts **no positional
+Debian's `ripgrep` 15.2.0, and starts MCP over stdio. It accepts **no positional
 arguments**. `/vault` must be a mounted directory, or the container exits
 before the server can create an ephemeral vault. Create an existing, absolute
 host directory for the vault; use `--mount` (not `-v`, which may create an
