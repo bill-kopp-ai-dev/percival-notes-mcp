@@ -516,3 +516,57 @@ placeholder; a fixture materializada está preservada na evidência privada.
 Pin atual `00010850…`, inventário, vault e seis MCPs foram preservados. Esta
 prova resolve o bloqueio 0033 e qualifica a construção offline da variante;
 não promove a imagem nem substitui a conformance/runtime funcional da variante.
+
+## 11. Candidato offline pinado e qualificado — 2026-11-09
+
+A issue 0033 do executor foi resolvida (commit `a3d40f1986` do
+`alternative-positronic`): o executor nomeia cada imagem que constrói e publica
+o `localReference` imutável do job produtor, e a receita do projeto declara os
+jobs produtores em `localBases`. O passo de host que esta nota de 2026-11-09
+deixava pendente — taguear a imagem no store e obter o digest de manifesto —
+deixou de existir: não há tag manual em nenhum ponto.
+
+Cadeia reconstruída por esta sessão, com a receita `canonical` do projeto:
+
+| Etapa | Job | Manifesto / imageId | Config digest | Scan SHA-256 | SBOM SHA-256 |
+|---|---|---|---|---|---|
+| runtime | `bbda217d0100c6163b5fda3e0359135809e9c30ea59773504f0f056f9bc675c9` | `sha256:acd98ac4e2e9309526b05125ab4f73776e29e981c282315928091662cde5fd67` | `sha256:5392929f6ae83d7b8d728c5155e38948c51808881c3b147abd6be702578da92a` | `961a09b2e082405a202481a9fdbc70fabe700d101bdf27125a0431a00027f475` | `f0b03758c6543e42f69684c6b56978657f3cf4395a06cf06ca222b38a97dbd75` |
+| wheelhouse | `fd234fc2fce4cb3d505f73a3a270e3e72bf9a25a16d5bb2bcefb44aa79a6bf00` | `sha256:6b121102248681eb12761956d4efc87e5f7a3b65e951d9d1bd4e5db9a6d3a58c` | `sha256:df0b02cf75e45293fa2f10bddaea16651a98c60c192afcc727b21a18d9f4e700` | `774aaa8c5fec7aa14f02ff9b67e6203c93c11b0e69f49064c712093aa46776d5` | `ac31a26371996235c036f87dfe2c1de8484a719f9d2f960d1fa9488344f29ac6` |
+| offline | `06e98ea0a754d74853ecde1eee2028a251850843e37d264ca31f44991eb9e0cb` | `sha256:6c1640ce8d0c823186858dcc04b7e793a997cf301ae4680f1c00d0b30cf3a7dd` | `sha256:8241420ec91072d26cba849939f7b9ad7ddf3efc980fe0981336d9c262596746` | `769e1036490ba71c41fde40e402ea1dea3aed866a6fba8d7e5056b3fa163216b` | `0bd5a18bdbc3ef2415789ee6b8ae385b4017fc6e6ff03256833fad1f2e56bdff` |
+
+Trivy 0.76.1, base de 2026-11-09, gate `[HIGH, CRITICAL]` bloqueante e zero
+findings nas três etapas. O build do produto correu com `--network none` e
+`imageResolution: verified`.
+
+Quatro pontos que esta sessão apurou e que mudam o desenho:
+
+1. **A base de runtime construída pelo executor tem os mesmos digests do build
+   directo feito pelo owner no host** (`configDigest` `5392929f…`, manifesto
+   `acd98ac4…`): as duas rotas são comparáveis e o build é reprodutível.
+2. **O build offline é reprodutível**: um segundo build do mesmo conteúdo
+   devolveu o mesmo image ID e o mesmo `contextSha256` (`ab88bb56…`).
+3. **A variante offline tinha três defeitos reais**, que a qualificação
+   funcional expôs: o script de verificação do wheelhouse não entrava no
+   contexto, o interpretador não era copiado para o estágio de runtime e
+   `/vault` não era criado com a titularidade `65532:65532` — sem esta última
+   correção o vault montado não seria gravável pelo uid do serviço.
+4. **A autorização exige que a receita do policy não mude entre o build e a
+   autorização** (`grant()` compara o digest da receita com o `recipeSha256`
+   do job): restaurar a policy antes de autorizar produz `policy-denied`. A
+   sequência correcta é build → autorização → pin → validação → restauração
+   da policy.
+
+Estado final: o servidor Notes está com a **imagem offline** pinada (revisão 22,
+`configurationId` `9434f3a0…`), 12 tools redescobertas, smoke funcional completo
+com nota sintética escrita, lida, pesquisada, removida e vault confirmado
+vazio. A allowlist foi reposta ao mínimo (`notes_get_status`,
+`notes_get_stats`) e a policy voltou à revisão `6ee7fa43…` (network default,
+timeout 120000, sem `localBases` persistido) — a mesma revision que o
+qualificador 0033 deixou, porque o estado é endereçado por conteúdo.
+
+Limites: a variante offline **continua não ativada na receita** (o `Dockerfile`
+da raiz é o do produto com rede); ativar é decisão do owner. O candidato
+anterior `sha256:0001085057…` continua autorizado e fixável num comando. O
+relatório bruto do Trivy e o SBOM permanecem no host. Evidência canônica em
+`pblabs-mcp-index/servers/notes/security-scan-e6a8005-6c1640ce.json` e na
+seção do tracker F3.
