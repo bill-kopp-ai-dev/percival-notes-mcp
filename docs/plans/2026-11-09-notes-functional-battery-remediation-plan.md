@@ -428,9 +428,13 @@ comportamento já correto.
 
 **Evidência do ciclo de imagem:**
 [docs/issues/2026-11-09-notes-nfb-remediation-image-cycle.md](../issues/2026-11-09-notes-nfb-remediation-image-cycle.md)
-— candidato final `sha256:0c8fdf75…` (job `734728be97533c7de…`), scan Trivy
-com 0 findings, pin na revisão 24 do server `notes`, 12/12 achados exercitados
-pelo MCP real sobre a fixture F3 restaurada ao final.
+— candidato final `sha256:0c8fdf75…` (job `9611052434b01420…`), construído a
+partir da árvore commitada `7c1a87e`, scan Trivy com 0 findings, pin na
+revisão 25 do server `notes`, 12/12 achados exercitados pelo MCP real sobre a
+fixture F3 restaurada ao final. O documento também registra o diagnóstico do
+flag `dirty` do executor: ele é estruturalmente `true` neste repositório
+porque `AGENTS.md` é excluído do manifesto de contexto e a comparação é de
+contagens de conjuntos diferentes — não há alteração não commitada.
 
 Acrescentar a cada linha fechada o identificador do teste, revisão do código
 e evidência da imagem quando aplicável. Falha/skip não vira aprovação;
@@ -529,9 +533,14 @@ Conclusão requer:
 - [ ] Um registro durável do ciclo com resultado e próximo passo no journal
       autorizado, quando disponível; não duplicar notas nem usar outro target
       como fallback. Nesta sessão o target `percival-notes-mcp` retornou
-      `not-found`; este plano é o artefato persistido disponível.
+      `not-found`; este plano é o artefato persistido disponível. O registro foi
+      gravado no target `global`, que é o target autorizado disponível para
+      esta sessão.
 
-**Próxima ação após o aceite do plano:** commit da remediação (`notes_mcp.py`,
-`tests/test_functional_battery.py`, README, docs) e, se o owner quiser, novo
-build a partir da árvore commitada para eliminar a marca `dirty` da evidência
-do ciclo de imagem.
+**Próxima ação após o aceite do plano:** executada em 2026-11-09 — commit da
+remediação (`7c1a87e`, publicado em `refs/heads/main`) e novo build a partir
+da árvore commitada (candidato D, job `9611052434b01420…`), repinado na
+revisão 25 e requalificado com 12/12 achados pelo MCP real. A marca `dirty`
+persistiu e foi diagnosticada como estrutural do executor (ver o documento do
+ciclo de imagem), não como árvore suja. Restam apenas decisões de promoção e
+a execução do harness de conformidade no host.
