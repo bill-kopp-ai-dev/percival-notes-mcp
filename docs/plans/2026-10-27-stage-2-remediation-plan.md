@@ -1,7 +1,7 @@
 # Stage-2 — Remediação do Percival Notes MCP
 
 **Data / revisão:** 2026-11-09 / 1.9.
-**ID / estado:** S2-NT / 10/10 ações locais mantidas concluídas/aceitas; smoke funcional pontual no agente Percival passou com a imagem `c1f367…`; o candidato vigente `c1f367…` foi reescaneado em 2026-11-08 com base de vulnerabilidades de 2026-11-07 (0 findings). **Em 2026-11-09 o bloqueio de build foi resolvido**: a causa era `network: none` na receita `canonical`, não o produto; com `network: default` o executor construiu o candidato `00010850…` (revisão `6a4b082`), escaneou-o com gate `[HIGH, CRITICAL]` bloqueante e 0 findings, e o servidor Notes foi repinnado nele (revisão 21, 12 tools). A publicação dos commits locais está validada em dry-run (`valid: true`) e sai num push único. O objetivo de build sem egress (seção 8) segue instrumentado, com a base de runtime construída e a base wheelhouse em reconstrução.
+**ID / estado:** S2-NT / 10/10 ações locais mantidas concluídas/aceitas; smoke funcional pontual no agente Percival passou com a imagem `c1f367…`; o candidato vigente `c1f367…` foi reescaneado em 2026-11-08 com base de vulnerabilidades de 2026-11-07 (0 findings). **Em 2026-11-09 o bloqueio de build foi resolvido**: a causa era `network: none` na receita `canonical`, não o produto; com `network: default` o executor construiu o candidato `00010850…` (revisão `6a4b082`), escaneou-o com gate `[HIGH, CRITICAL]` bloqueante e 0 findings, e o servidor Notes foi repinnado nele (revisão 21, 12 tools). A publicação dos commits locais está validada em dry-run (`valid: true`) e sai num push único. A cadeia de build sem egress foi qualificada em 2026-11-09 pelo executor corrigido (seção 10); a variante não foi promovida e a receita original foi restaurada.
 **Checkout executor:** `/home/bill/Projects/percival-notes-mcp`.  
 **Owner e signatário único:** Bill Kopp (`bill.kopp.dev@gmail.com`), responsável único pelo Notes MCP e pela infraestrutura IaC da Positronic Bean Labs (`https://labs.positronicbean.com`); único colaborador destes projetos.
 
@@ -487,3 +487,32 @@ do projeto:
 Limites desta seção: a publicação continua fora do escopo do produto; o
 runtime gerenciado amplo, o vault real e a distribuição não foram qualificados;
 e o build offline da seção 8 continua sem execução.
+
+
+## 10. Qualificação da cadeia offline pelo executor 0033 — 2026-11-09
+
+Bill autorizou executar o plano 0033. O executor atualizado construiu runtime
+(job `7cde7705…`, manifesto `acd98ac4…`), wheelhouse (`fbf58677…`, manifesto
+`6b121102…`) e a variante offline (`9ea5a1b3…`, manifesto
+`sha256:7b6a283b11c23ffff60e595dd490f2a3f00e75027e8e91a484cd59e17328f2c3`).
+Todos completos, com nome reservado/localReference verificados, gate
+HIGH/CRITICAL bloqueante, zero findings e scan/SBOM. Wheelhouse consome o
+recibo runtime; o produto consome ambos por FROM literal com manifesto. As
+submissões e ajustes temporários de policy foram feitos por tools nativas em
+sessões V2 reais do agente OCI, sem tag manual ou acesso Engine no agente.
+
+A contraprova reconstruiu o contexto exato do recibo offline em daemon DinD
+Docker 29.9.2/containerd sem rede, sem rotas e com cache de build desativado,
+carregando as bases com seus nomes originais. A resolução externa negativa
+falhou e o build Notes passou. O manifesto isolado `2d64bec6…` pertence a
+outra execução; não se alega reprodução bit a bit ou scan desse outro artefato.
+O registro técnico único, IDs/hashes completos, recibos, ambiente e limites
+estão no [plano 0033](../../../alternative-positronic/positronic/docs/plans/POSITRONIC_ISSUE_0033_EXECUTOR_BUILT_IMAGE_REFERENCES_PLAN.md).
+
+Dockerfile original e policy foram restaurados; revisão de policy voltou
+exatamente a `6ee7fa43…` (network default, timeout 120000, gate HIGH/CRITICAL,
+sem localBases persistido). A variante versionada permanece inativa com
+placeholder; a fixture materializada está preservada na evidência privada.
+Pin atual `00010850…`, inventário, vault e seis MCPs foram preservados. Esta
+prova resolve o bloqueio 0033 e qualifica a construção offline da variante;
+não promove a imagem nem substitui a conformance/runtime funcional da variante.
