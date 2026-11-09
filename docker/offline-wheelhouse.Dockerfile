@@ -31,21 +31,5 @@ LABEL org.opencontainers.image.title="Percival Notes MCP wheelhouse base" \
       org.opencontainers.image.revision="unknown"
 
 COPY ${WHEELHOUSE_MANIFEST} /wheels/manifest.json
-RUN python3 -c '
-import hashlib, json, pathlib, urllib.request
-
-manifest = json.loads(pathlib.Path("/wheels/manifest.json").read_text())
-wheels = pathlib.Path("/wheels")
-requirements = []
-for entry in [*manifest["bootstrap"], *manifest["runtime"], *manifest.get("build", [])]:
-    data = urllib.request.urlopen(entry["url"], timeout=120).read()
-    digest = hashlib.sha256(data).hexdigest()
-    if digest != entry["sha256"]:
-        raise SystemExit("hash mismatch for " + entry["filename"])
-    (wheels / entry["filename"]).write_bytes(data)
-    requirements.append(
-        entry["name"] + "==" + entry["version"] + " --hash=sha256:" + entry["sha256"]
-    )
-pathlib.Path("/wheels/requirements.txt").write_text("\n".join(requirements) + "\n")
-print("stored", len(requirements), "wheels")
-'
+COPY docker/offline-wheelhouse-fetch.py /wheels/fetch.py
+RUN python3 /wheels/fetch.py

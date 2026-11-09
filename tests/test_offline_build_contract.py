@@ -184,7 +184,15 @@ def test_wheelhouse_base_is_digest_pinned() -> None:
             f"the wheelhouse base must be digest-pinned, got {base}"
         )
     assert "manifest.json" in body
-    assert "hash mismatch" in body
+    assert "docker/offline-wheelhouse-fetch.py" in body, (
+        "the wheelhouse base must run the fetch script from a file, not from an "
+        "inline script: the Dockerfile parser reads a multiline RUN as instructions"
+    )
+    fetch = (REPO_ROOT / "docker" / "offline-wheelhouse-fetch.py").read_text(
+        encoding="utf-8"
+    )
+    assert "hash mismatch" in fetch, "the fetch script must verify every artifact hash"
+    assert "sha256" in fetch
 
 
 def test_offline_variant_keeps_the_runtime_identity() -> None:
