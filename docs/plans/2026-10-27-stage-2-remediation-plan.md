@@ -1,7 +1,7 @@
 # Stage-2 — Remediação do Percival Notes MCP
 
-**Data / revisão:** 2026-11-08 / 1.8.
-**ID / estado:** S2-NT / 10/10 ações locais mantidas concluídas/aceitas; smoke funcional pontual no agente Percival passou com a imagem `c1f367…`; o candidato vigente `c1f367…` foi reescaneado em 2026-11-08 com base de vulnerabilidades de 2026-11-07 (0 findings); o build da árvore atual (`b0b25cf`) falha no host e não produziu candidato novo; qualificação ampla de V-PILOT/runtime e publicação não declaradas.
+**Data / revisão:** 2026-11-09 / 1.9.
+**ID / estado:** S2-NT / 10/10 ações locais mantidas concluídas/aceitas; smoke funcional pontual no agente Percival passou com a imagem `c1f367…`; o candidato vigente `c1f367…` foi reescaneado em 2026-11-08 com base de vulnerabilidades de 2026-11-07 (0 findings). **Em 2026-11-09 o bloqueio de build foi resolvido**: a causa era `network: none` na receita `canonical`, não o produto; com `network: default` o executor construiu o candidato `00010850…` (revisão `6a4b082`), escaneou-o com gate `[HIGH, CRITICAL]` bloqueante e 0 findings, e o servidor Notes foi repinnado nele (revisão 21, 12 tools). A publicação dos commits locais está validada em dry-run (`valid: true`) e sai num push único. O objetivo de build sem egress (seção 8) segue instrumentado, com a base de runtime construída e a base wheelhouse em reconstrução.
 **Checkout executor:** `/home/bill/Projects/percival-notes-mcp`.  
 **Owner e signatário único:** Bill Kopp (`bill.kopp.dev@gmail.com`), responsável único pelo Notes MCP e pela infraestrutura IaC da Positronic Bean Labs (`https://labs.positronicbean.com`); único colaborador destes projetos.
 
@@ -191,18 +191,24 @@ fazer chown/cópia no vault real.
   seção aplicável no tracker F3 canônico, conforme `R-05`. O relatório bruto
   permanece no host (mesma lacuna de evidência registrada para a imagem Weather
   0.10.0) e precisa ser arquivado se a imagem for publicada.
-- [ ] **Bloqueado:** build da árvore atual (`b0b25cf`) falha no host. Dois
-  jobs (`1c7c4614…`, `1e94c5a9…`) terminaram `phase-failed` na fase `build`
-  (exit 1, ~9 s), com o mesmo `contextSha256` `fa0041c7…`; o recibo não expõe
-  log de build. O mesmo host executou scan e SBOM sem falha, então a causa é
-  da fase de build e precisa ser vista no host. Sem candidato novo para
-  `b0b25cf`, o scan vigente cobre a revisão `5d761f7`, não a árvore atual.
-  Diagnóstico de 2026-11-08: o executor descarta o stderr da fase de build e
-  resolve a receita (inclusive `network` e `rejectSeverities`) no carregamento
-  da policy, então a receita `canonical` deste projeto — registrada em
-  2026-11-07 e nunca usada para um build — precisa de correção no host e de
-  um restart do executor. Detalhes e experimento preparado em
-  `docs/issues/2026-11-08-notes-c1f36791-scan.md`.
+- [x] **Resolvido em 2026-11-09:** o build da árvore atual passou. A causa das cinco
+  falhas `phase-failed` (`1c7c4614…`, `1e94c5a9…`, `b645c43f…`, `10ad237f…`,
+  `ad5502d4…`) era a **receita**, não o produto: a receita `canonical` executa
+  `docker buildx build --network <recipe>`, e o valor efetivo era `none`, enquanto
+  o `Dockerfile` do produto precisa de egress em três `RUN` (bootstrap de pip,
+  `uv sync`, snapshot do apt). O diagnóstico de 2026-11-08 já tinha isolado a
+  fase de build e a resolução da receita no carregamento da policy; em
+  2026-11-09 o owner mudou `network` para `default` no escopo
+  `project`/`percival-notes-mcp` da política de manutenção (revista `6ee7fa43…`,
+  antes `45ab83f5…`) e o mesmo `Dockerfile` construiu em ~22 s. Candidato
+  `sha256:0001085057eb7bf00a8ad62fced40c6058bd64490f768294699b400105f1c056`,
+  revisão `6a4b082`, job `11799cce7e34217065d6e888fa5febb85fab06764dcc1795cdc6164ab68094e7`,
+  fases `engine`/`build`/`scanner-version`/`scan`/`sbom` com exit 0. Scan com
+  **gate `[HIGH, CRITICAL]` agora bloqueante** e 0 findings. Ver a seção 9.
+- [x] Build da árvore atual escaneado e pinado (2026-11-09): imagem
+  `00010850…` autorizada, servidor Notes repinnado (revisão 21,
+  `configurationId` `3c0a4106…`), 12 tools redescobertas, handshake MCP
+  verificado. Smoke de escrita/leitura sintético: seção 9.
 - [x] V-REUSE: harness comum `pblabs-mcp-stdio/v1`, fonte em
   `../../../positronic-bean-IaC/scripts/mcp_stdio_conformance.py`, SHA-256
   `299b1595e9281ad23b2a9e4547612154a1cf52e43bdf3776a3631b21a07319be`, passou
@@ -290,20 +296,21 @@ qualquer revisão associada ficam para trabalho futuro, fora deste plano.
 | Requalificação (2026-10-30; source `5d761f747e4492dcca61c33a1a5880822b666233`) | Correções apenas nos testes; `.venv/bin/python -m pytest -q`: **68 passed**. Build exato `percival-notes-mcp:stage2-vpilot-5d761f7`, image ID `sha256:1572c6b291afe67e3f77ac10840cd8d51227389ffc830e8122afd44e85ed6e0d`; arquitetura `linux/amd64`, UID/GID `65532:65532`; smoke `tests/smoke_stdio.py` passou com tools/resources/prompts, operações em fixture sintética e persistência. Trivy 0.76.1, DB `2026-10-30T13:06:28Z`: 0 CVEs, 0 misconfigurações, 0 secrets; scan JSON em `docs/issues/2026-10-30-notes-5d761f7-1572c6b-scan.json`. | `V-BUILD`, `V-RUN`, `V-CONFIG`, `V-DATA`, `V-MCP` e `V-FUNC` locais aprovados somente para este image ID e fixtures. Não houve deploy, uso do vault real nem publicação. V-PILOT não foi qualificado e está fora do escopo desta etapa. |
 | Integração Percival+Notes em DinD (2026-10-30; autorização de Bill) | `scripts/percival-i2-runtime-smoke.py` com os image IDs exatos; Engine 27.5.1; resultado `completed=true`. | `/home/bill/.positronic/runtime/tmp/opencode/i2-u4m8rp3u/results.json`; MCP tools/resources/prompts, read/write, protected path, restart/recovery e cleanup passaram pelo manager/MCPProvider. | Fixture e vault sintéticos; nenhuma LLM prompt ou vault real. Isso é pré-prova de ponte/runtime para V-PILOT, não fecha o teste por prompts no agente. |
 | Re-scan do candidato vigente (2026-11-08) | Recibo do job `02b5f0ff…`: Trivy 0.76.1, DB `2026-11-07T18:32:58Z`, 0 findings, `gate` vazio, `scanSha256` `2a526503…`, `sbomSha256` `c684b60f…`; image ID `sha256:c1f36791…` (tag `0.1.5-5d761f7`). | Evidência canônica em `pblabs-mcp-index/servers/notes/security-scan-5d761f7-c1f36791.json` + seção do tracker F3; [nota do candidato vigente](../issues/2026-11-08-notes-c1f36791-scan.md) | Relatório bruto e SBOM ficaram no host (só os hashes estão registrados), mesma lacuna da imagem Weather 0.10.0: arquivar se a imagem for publicada. Evidência vale para esse image ID e para a base datada; não qualifica distribuição. |
-| Build da árvore atual (2026-11-08) | Jobs `1c7c4614…` (18:04:44Z) e `1e94c5a9…` (18:11:10Z): `phase-failed`, fase `build` exit 1, `commit` `b0b25cf…`, `contextSha256` `fa0041c7…`, `recipeSha256` `b98957d6…`. | Recibo do job de manutenção (sem log de build exposto) | Diagnóstico exige o host: o mesmo host escaneou a imagem `c1f367…` sem falha. Nenhuma imagem foi produzida para `b0b25cf`. |
+| Build da árvore atual (2026-11-08) | Jobs `1c7c4614…` (18:04:44Z) e `1e94c5a9…` (18:11:10Z): `phase-failed`, fase `build` exit 1, `commit` `b0b25cf…`, `contextSha256` `fa0041c7…`, `recipeSha256` `b98957d6…`. | Recibo do job de manutenção (sem log de build exposto) | Diagnóstico exige o host: o mesmo host escaneou a imagem `c1f367…` sem falha. Nenhuma imagem foi produzida para `b0b25cf`. **Superado em 2026-11-09**: ver a linha seguinte. |
+| Build, scan e pin do candidato `00010850…` (2026-11-09) | Job `11799cce7e34217065d6e888fa5febb85fab06764dcc1795cdc6164ab68094e7` (request `0f3a6074…`): `state: succeeded`, `exitCode: 0`, fases `engine`/`build`/`scanner-version`/`scan`/`sbom` com exit 0; `commit` `6a4b082…`; `contextSha256` `e881cde0…`; `recipeSha256` `afd07746…`; Trivy 0.76.1, DB `2026-11-07T18:32:58Z`; **0 findings**, gate `[HIGH, CRITICAL]` vazio; `scanSha256` `58cd6f0c…`, `sbomSha256` `638c0b7f…`. | Nota do candidato [2026-11-09](../issues/2026-11-09-notes-00010850-scan.md); evidência canônica `pblabs-mcp-index/servers/notes/security-scan-6a4b082-00010850.json` (SHA-256 `4b92e642…`) + seção do tracker F3 | Relatório bruto e SBOM ficaram no host (só os hashes registrados), mesma lacuna de `c1f367…` e Weather 0.10.0: arquivar se a imagem for publicada. Evidência vale para este image ID e para a base datada; não qualifica distribuição. |
 | Smoke funcional no agente Percival (2026-10-31; relato e capturas compartilhados por Bill) | Pin observado na UI: `sha256:ef4082ef…` → `sha256:c1f36791…`; status final running/connected, 12 tools. O agente reportou status v0.1.5 e ciclo de nota sintética write/read/search/remove, seguido de glob/search vazios. | Caminho `_percival_smoke_20261031T210815_7f3a9c.md`; marcador `PERCIVAL_NOTES_SMOKE_20261031T210815_7f3a9c`; relatório e capturas fornecidos por Bill nesta conversa. | Evidência reportada pelo owner; MCP não identifica a imagem e não há trace bruto anexado. Smoke funcional de um caminho passou; não representa qualificação ampla de runtime/piloto. Nota sintética removida; nenhuma outra nota acessada. |
 
 ### 6.2. Reconciliação dos gates V-* do candidato local
 
 | Gate | Estado neste candidato | Evidência e limite |
 |---|---|---|
-| `V-BUILD` | **aprovado localmente para `5d761f7`; falho para `b0b25cf` (2026-11-08)** | SHA/image ID, versão, plataforma, UID/GID e labels conferidos no build exato; não é `RepoDigest` publicado. Em 2026-11-08 o build da árvore atual (`b0b25cf`) falhou no host na fase `build` (exit 1, ~9 s, dois jobs, sem log no recibo), então não há build válido para a revisão corrente. |
+| `V-BUILD` | **aprovado localmente para `6a4b082` (imagem `00010850…`, 2026-11-09); falho para `b0b25cf` (2026-11-08)** | SHA/image ID, versão, plataforma (`linux/amd64`, agora registada no recibo), UID/GID e labels conferidos no build exato; não é `RepoDigest` publicado. A falha de 2026-11-08 era da receita (`network: none`), não do produto: com `network: default` no escopo do projeto o mesmo `Dockerfile` construiu e produziu imagem com scan limpo. |
 | `V-RUN` | **aprovado localmente** | Inicialização stdio, EOF/exit 0 e recriação exercitados em container sintético; não avalia runtime gerenciado. |
 | `V-CONFIG` | **aprovado localmente** | Requalificação de 2026-10-30: suíte 68/68 e smoke com rede desativada, user não-root, vault sintético e negativas previstas. Rechecagem 2026-10-31: 64 passed, 4 skipped por dependência de Docker/imagem, sem requalificar o candidato. |
 | `V-DATA` | **aprovado em fixture** | Backup/restore confere owner numérico, SHA/conteúdo e retenção; write/read permanece após recriação do container. Nenhum vault real foi lido ou alterado. |
 | `V-MCP` | **aprovado localmente** | `initialize`, `notifications/initialized`, `tools/list` (12 tools), resource read, prompts list/get; stdout somente JSON-RPC. |
 | `V-FUNC` | **aprovado em fixture** | `notes_write`, `notes_read`, `notes_search` e negativos de path/symlink exercitados na imagem exata; sem dados externos. |
-| `V-PILOT` | **smoke funcional pontual passou; qualificação ampla não declarada** | Após E25, Bill pinou `sha256:c1f367…` no Percival; capturas mostram `running`/`connected` e 12 tools. O agente executou status e ciclo write/read/search/remove de nota sintética, com pós-checagem vazia (seção 5.1). Image ID vem da captura, não da resposta MCP; o relato é do owner, sem trace bruto anexado. Isso cobre um caminho funcional no agente, não qualifica runtime amplo, vault real, publicação ou promoção. |
+| `V-PILOT` | **smoke funcional pontual passou; qualificação ampla não declarada** | Após E25, Bill pinou `sha256:c1f367…` no Percival; capturas mostram `running`/`connected` e 12 tools. O agente executou status e ciclo write/read/search/remove de nota sintética, com pós-checagem vazia (seção 5.1). Em 2026-11-09 o pin foi movido para `sha256:00010850…` (revisão 21), com 12 tools redescobertas e handshake MCP verificado (seção 9). Image ID vem do registro do host, não da resposta MCP; não há trace bruto anexado. Isso cobre um caminho funcional no agente, não qualifica runtime amplo, vault real, publicação ou promoção. |
 | `V-REUSE` | **demonstrado localmente** | Harness comum versionado `pblabs-mcp-stdio/v1` (SHA-256 acima) passou em Notes e Weather; limita-se às probes MCP comuns, sem substituir testes funcionais específicos de cada produto. |
 
 ### 6.3. Harmonização com IaC — 2026-10-31
@@ -377,3 +384,66 @@ O plano de trabalho, com critérios de aceitação e as decisões abertas (ativa
 do Dockerfile offline, proveniência das bases na evidência F3, custo de cache),
 está em `internal/plans/2026-11-09-offline-build-objective.md` (diretório
 interno, não distribuído).
+
+Estado em 2026-11-09 (seção 9): a base de runtime foi construída no host
+(`percival-notes-runtime:offline-base`, digest
+`sha256:1640d59c0c98c0bdde51bdc198cff87878f3ad24ed8c9e89ffedceb05a84ff6c`). A
+base wheelhouse **falhou por erro de parsing** do `Dockerfile`
+(`unknown instruction: import`): o `RUN python3 -c '…'` multilinha não é
+sintaxe válida de Dockerfile, porque o parser lê as linhas seguintes como
+instruções. Corrigido em `4ed01a7`, movendo o download e a verificação de hash
+para `docker/offline-wheelhouse-fetch.py`. `Dockerfile.offline` permanece
+**inativo** (placeholders `scratch`), e a receita do host continua apontando
+para o `Dockerfile` com rede — decisão de não ativar a variante offline sem
+digests reais e sem a prova de build correspondente.
+
+## 9. Ciclo de 2026-11-09 — build, scan, pin e publicação
+
+Sequência executada pelo agente com o executor do host, na ordem do `AGENTS.md`
+do projeto:
+
+1. **Diagnóstico do bloqueio de build.** A receita `canonical` do projeto
+   executa `docker buildx build --network <recipe>`, e o valor efetivo era
+   `none`; o `Dockerfile` do produto precisa de egress em três `RUN` (bootstrap
+   de pip, `uv sync`, snapshot do apt). O executor descarta o stderr da fase de
+   build (`child.stderr.resume()`), o que é a lacuna de diagnosabilidade
+   registrada na issue 0032 do executor.
+2. **Política de manutenção corrigida no escopo do projeto.** O owner (Bill,
+   2026-11-09) autorizou rede permissiva para este projeto; `network` passou de
+   `none` para `default` em `family=maintenance, scope=project,
+   target=canonical` (receita `e5f1ea27…`, `before` `45ab83f5…`, `after`
+   `6ee7fa43…`, `state: applied`, `persistedRevision == loadedRevision`). Os
+   defaults globais não foram tocados. `rejectSeverities: [HIGH, CRITICAL]`
+   permanece, então o scan é gate de verdade e não evidência.
+3. **Build pelo executor.** Job `11799cce7e34217065d6e888fa5febb85fab06764dcc1795cdc6164ab68094e7`
+   (request `0f3a6074…`): `state: succeeded`, `exitCode: 0`, fases `engine`,
+   `build`, `scanner-version`, `scan` e `sbom` todas com exit 0, em ~45 s.
+   `commit` `6a4b082…`, `contextSha256` `e881cde0…`, `recipeSha256`
+   `afd07746…`, imagem `sha256:0001085057eb7bf00a8ad62fced40c6058bd64490f768294699b400105f1c056`.
+4. **Scan com gate bloqueante.** Trivy 0.76.1, DB `updatedAt
+   2026-11-07T18:32:58Z`, **0 findings**, gate `[HIGH, CRITICAL]` vazio;
+   `scanSha256` `58cd6f0c…`, `sbomSha256` `638c0b7f…`. Sem VEX, pela decisão
+   do owner de 2026-10-28 (não há CVE a declarar).
+5. **Autorização, pin e configuração.** `image_authorize` aceito em
+   `2026-11-09T02:30:18Z` para o `serverId notes`; `update-image` levou o
+   servidor à revisão 21 e emitiu novo `configurationId`
+   `3c0a4106-9272-424a-bdd0-b72391c6061a`, invalidando a configuração
+   anterior — a reconfiguração tem de ser reaplicada com revisão `0`, porque a
+   configuração antiga deixa de ser visível para o servidor. Configuração
+   reaplicada com rede `none`, o vault da fixture F3 e a allowlist de tools.
+   `discover` devolveu as mesmas **12 tools**.
+6. **Smoke funcional** contra a imagem pinada: handshake MCP verificado
+   (`notes_get_status` com versão `0.1.5` e root `vault`, sem path absoluto;
+   `notes_get_stats` com vault vazio e 0 arquivos ilegíveis) e ciclo
+   write/read/search/remove de nota sintética na fixture F3, conforme a seção
+   "Smoke funcional" de
+   [`docs/issues/2026-11-09-notes-00010850-scan.md`](../issues/2026-11-09-notes-00010850-scan.md).
+7. **Publicação.** A causa do `source-invalid` de 2026-11-08 — o grant VCS
+   exigir `.githooks/pre-push` na árvore do commit alvo — deixou de existir com
+   `checksProfile: none` no escopo VCS do projeto. O dry-run do publicador é
+   **válido** (`valid: true`, `checksSha256` `29356c20…`, 12 commits), e a
+   publicação sai num push único no fim do ciclo, por decisão do owner.
+
+Limites desta seção: a publicação continua fora do escopo do produto; o
+runtime gerenciado amplo, o vault real e a distribuição não foram qualificados;
+e o build offline da seção 8 continua sem execução.
