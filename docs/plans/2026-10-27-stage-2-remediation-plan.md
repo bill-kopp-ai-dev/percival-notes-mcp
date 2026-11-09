@@ -434,9 +434,11 @@ do projeto:
    `discover` devolveu as mesmas **12 tools**.
 6. **Smoke funcional** contra a imagem pinada: handshake MCP verificado
    (`notes_get_status` com versão `0.1.5` e root `vault`, sem path absoluto;
-   `notes_get_stats` com vault vazio e 0 arquivos ilegíveis) e ciclo
-   write/read/search/remove de nota sintética na fixture F3, conforme a seção
-   "Smoke funcional" de
+   `notes_get_stats` com vault vazio e 0 arquivos ilegíveis) e ciclo completo
+   write → read → search → remove de uma nota sintética
+   (`_percival_smoke_20261109T030000_9c2f41.md`, marcador
+   `PERCIVAL_NOTES_SMOKE_20261109T030000_9c2f41`), com pós-checagem de glob e
+   search vazia. Detalhes em
    [`docs/issues/2026-11-09-notes-00010850-scan.md`](../issues/2026-11-09-notes-00010850-scan.md).
 7. **Publicação.** A causa do `source-invalid` de 2026-11-08 — o grant VCS
    exigir `.githooks/pre-push` na árvore do commit alvo — deixou de existir com
