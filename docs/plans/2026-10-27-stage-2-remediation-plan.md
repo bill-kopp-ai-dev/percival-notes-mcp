@@ -397,6 +397,42 @@ para `docker/offline-wheelhouse-fetch.py`. `Dockerfile.offline` permanece
 para o `Dockerfile` com rede — decisão de não ativar a variante offline sem
 digests reais e sem a prova de build correspondente.
 
+### 8.1. As duas bases construídas pelo executor — 2026-11-09
+
+O executor constrói a receita `canonical` do projeto, que aponta para o
+`Dockerfile` da raiz: o `operations.image.dockerfile` do `project.json` só
+entra no registro da receita e não muda a receita já registrada. Para
+construir as bases, o `Dockerfile` da raiz foi substituído temporariamente
+pelo da base em causa e revertido em seguida — cada build foi conferido por
+`git status` antes de seguir.
+
+| Build | Job | Resultado |
+|---|---|---|
+| Base wheelhouse sobre `python:3.12-slim-trixie` | `4fe72817…` | build exit 0, **scan bloqueou**: 51 findings HIGH/CRITICAL. A base trixie carrega os pacotes Debian daquela release; o produto final não tem, porque nasce de `debian:forky-slim` |
+| Base wheelhouse sobre a base de runtime (forky) | `7c2791d4…` | build exit 0, **0 findings**, gate vazio. Imagem `sha256:974c5ccc88bd5211e65aee85bd489e2081db44e158744e01171d483b6db3a9aa`, `scanSha256` `2fd3a980…`, `sbomSha256` `94e01de4…` |
+| Sonda de resolução de digest local | `18015dfe…` | `FROM percival-notes-runtime:offline-base@sha256:1640d59c…` **resolve** e escaneia com 0 findings |
+| Variante offline com `--network none` | `bc0bdfd9…` | **falhou** em `registry-authentication`: o executor não tagueia a imagem que constrói e o BuildKit não resolve imagem local pelo digest de configuração |
+
+Consequências que mudam o desenho:
+
+- A base wheelhouse passa a ser a **base de runtime + runtime CPython**: é
+  a única forma de a base passar o gate bloqueante, e elimina a duplicação do
+  estágio `apt` do produto.
+- A referência por digest só resolve para base **tageada** no store do host.
+  O executor produz imagem sem tag e só expõe o digest de configuração
+  (`imageId`), que o BuildKit trata como referência de registry. Falta, do
+  host: taguear a imagem `sha256:974c5ccc…` e informar o digest do manifesto.
+- `Dockerfile.offline` tinha dois defeitos reais, corrigidos: o script de
+  verificação do wheelhouse não entrava no contexto e o binário `python3.12`
+  não era copiado para o estágio de runtime (o entrypoint ficaria sem
+  interpretador).
+- O `.dockerignore` não incluía `docker/offline-wheelhouse-fetch.py`, o que
+  impedia o próprio comando de build documentado no Dockerfile de funcionar.
+
+A política de manutenção foi movida temporariamente (`network: none`,
+`timeoutMs: 900000`) durante as provas e devolvida ao estado anterior
+(revisão `6ee7fa43…`, idêntica à de antes das mudanças).
+
 ## 9. Ciclo de 2026-11-09 — build, scan, pin e publicação
 
 Sequência executada pelo agente com o executor do host, na ordem do `AGENTS.md`

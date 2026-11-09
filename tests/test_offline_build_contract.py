@@ -120,7 +120,7 @@ def test_offline_dockerfile_has_no_network_instruction() -> None:
 
 
 def test_offline_variant_is_pinned_or_explicitly_inactive() -> None:
-    """The offline path is inert until real base digests replace the placeholders."""
+    """Each base is pinned by digest, or the variant stays inert."""
     instructions = _instructions(OFFLINE_DOCKERFILE)
     arguments = dict(re.findall(r"^ARG\s+(\w+)=(\S+)", "\n".join(instructions), re.MULTILINE))
     bases = {
@@ -129,15 +129,19 @@ def test_offline_variant_is_pinned_or_explicitly_inactive() -> None:
         if name in {"RUNTIME_BASE", "WHEELHOUSE_BASE"}
     }
     assert set(bases) == {"RUNTIME_BASE", "WHEELHOUSE_BASE"}
-    active = all(
-        re.fullmatch(r"sha256:[a-f0-9]{64}", value) for value in bases.values()
-    )
-    if active:
-        return
+    pinned = {
+        name
+        for name, value in bases.items()
+        if re.fullmatch(r"(?:[a-z0-9][a-z0-9._/:-]*@)?sha256:[a-f0-9]{64}", value)
+    }
     for name, value in bases.items():
+        if name in pinned:
+            continue
         assert value == PLACEHOLDER, (
             f"{name} must be either a digest or the documented placeholder, got {value}"
         )
+    if len(pinned) == len(bases):
+        return
     project = json.loads(
         (REPO_ROOT / ".positronic" / "project.json").read_text(encoding="utf-8")
     )

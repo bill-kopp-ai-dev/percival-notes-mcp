@@ -12,6 +12,13 @@
 # verified against `uv.lock` and `uv-bootstrap-requirements.lock` by
 # `tests/test_offline_build_contract.py`.
 #
+# The base is the hardened runtime base (Debian forky, every package pinned to
+# a dated snapshot, no package manager and no setuid bits) plus the CPython
+# runtime, exactly like the product's runtime stage. Building it on top of the
+# raw `python:3.12-slim-trixie` image instead would import that release's
+# Debian packages, and the executor's blocking scan gate rejects the image:
+# the trixie base carries 51 HIGH/CRITICAL findings, the forky runtime none.
+#
 # Build with network access:
 #   docker build -f docker/offline-wheelhouse.Dockerfile \
 #     --build-arg WHEELHOUSE_MANIFEST=vendor/wheelhouse-manifest.json \
@@ -20,7 +27,9 @@
 # Keep the build log and the digest: they are part of the image provenance
 # recorded in the F3 evidence.
 
-FROM python:3.12-slim-trixie@sha256:2b4f19dae3a777dfc3b76730bda1e82e1f66ab2a2686fa93ca78edbfb4f04ffe
+FROM python:3.12-slim-trixie@sha256:2b4f19dae3a777dfc3b76730bda1e82e1f66ab2a2686fa93ca78edbfb4f04ffe AS python-runtime
+
+FROM percival-notes-runtime:offline-base@sha256:1640d59c0c98c0bdde51bdc198cff87878f3ad24ed8c9e89ffedceb05a84ff6c
 
 ARG WHEELHOUSE_MANIFEST=vendor/wheelhouse-manifest.json
 LABEL org.opencontainers.image.title="Percival Notes MCP wheelhouse base" \
@@ -29,6 +38,13 @@ LABEL org.opencontainers.image.title="Percival Notes MCP wheelhouse base" \
       org.opencontainers.image.vendor="Positronic Bean Labs" \
       org.opencontainers.image.version="1" \
       org.opencontainers.image.revision="unknown"
+
+COPY --from=python-runtime /usr/local/bin/python3.12 /usr/local/bin/python3.12
+COPY --from=python-runtime /usr/local/lib/python3.12 /usr/local/lib/python3.12
+COPY --from=python-runtime /usr/local/lib/libpython3.12.so.1.0 /usr/local/lib/libpython3.12.so.1.0
+RUN ln -sf /usr/local/lib/libpython3.12.so.1.0 /usr/local/lib/libpython3.12.so \
+    && ln -sf /usr/local/bin/python3.12 /usr/local/bin/python3 \
+    && ln -sf /usr/local/bin/python3.12 /usr/local/bin/python
 
 COPY ${WHEELHOUSE_MANIFEST} /wheels/manifest.json
 COPY docker/offline-wheelhouse-fetch.py /wheels/fetch.py

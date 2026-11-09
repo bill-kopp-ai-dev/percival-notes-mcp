@@ -8,3 +8,8 @@
 !README.md
 !LICENSE
 !vendor/wheelhouse-manifest.json
+!docker/offline-wheelhouse-fetch.py
+!docker/offline-wheelhouse.Dockerfile
+!docker/offline-runtime.Dockerfile
+!Dockerfile.offline
+!scripts/offline-wheelhouse.py

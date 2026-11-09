@@ -6,8 +6,8 @@
 # No step in this file reaches the network, which is the property
 # `tests/test_offline_build_contract.py` enforces.
 #
-# The two base images are built once with network access by the operator and
-# pinned here by digest:
+# The two base images are built once with network access and pinned here by
+# digest:
 #
 #   docker build -f docker/offline-runtime.Dockerfile \
 #     --build-arg DEBIAN_SNAPSHOT=20261020T000000Z -t percival-notes-runtime:offline-base .
@@ -15,15 +15,28 @@
 #     --build-arg WHEELHOUSE_MANIFEST=vendor/wheelhouse-manifest.json \
 #     -t percival-notes-wheelhouse:offline-base .
 #
-# Replace the placeholder digests below with the digests of those two images
-# before switching the recipe to this file. The placeholder is deliberately
-# invalid so that an accidental activation fails loudly instead of building
-# something unexpected.
+# The digests below are the ones built and scanned on 2026-11-09:
+#
+#   RUNTIME_BASE    percival-notes-runtime:offline-base@sha256:1640d59c... (owner build)
+#   WHEELHOUSE_BASE pending: see below
+#
+# The wheelhouse base was built and scanned by the executor on 2026-11-09 (job
+# 7c2791d4e30a21cc70ba2c02cc6bd8b7355bf3bb18aec4c38e2284f5ae2253cb, image
+# sha256:974c5ccc88bd5211e65aee85bd489e2081db44e158744e01171d483b6db3a9aa,
+# 0 findings at the blocking gate). It is still the documented placeholder
+# here for one reason: the executor's build output carries no tag, and
+# BuildKit cannot resolve a local image by its config digest, so the image has
+# to be tagged in the host store and its manifest digest recorded before this
+# variant can consume it. The placeholder is deliberately invalid so that an
+# accidental activation fails loudly instead of building something unexpected.
+#
+# Switching the executor recipe to this file is an owner decision: the recipe
+# still points at the networked `Dockerfile` until that decision is taken.
 #
 # The result is equivalent to the networked `Dockerfile`: same Debian runtime,
 # same locked Python dependencies, same non-root user, same entrypoint.
 
-ARG RUNTIME_BASE=scratch
+ARG RUNTIME_BASE=percival-notes-runtime:offline-base@sha256:1640d59c0c98c0bdde51bdc198cff87878f3ad24ed8c9e89ffedceb05a84ff6c
 ARG WHEELHOUSE_BASE=scratch
 
 FROM ${WHEELHOUSE_BASE} AS builder
@@ -32,6 +45,7 @@ ENV UV_PROJECT_ENVIRONMENT=/opt/venv \
     UV_LINK_MODE=copy
 WORKDIR /app
 COPY pyproject.toml uv.lock notes_mcp.py README.md LICENSE ./
+COPY scripts/offline-wheelhouse.py /app/scripts/offline-wheelhouse.py
 COPY vendor/wheelhouse-manifest.json /wheels/manifest.json
 RUN python3 /app/scripts/offline-wheelhouse.py verify \
         --manifest /wheels/manifest.json --wheelhouse /wheels
@@ -62,6 +76,7 @@ ENV PATH=/opt/venv/bin:$PATH \
     PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1
 
+COPY --from=builder /usr/local/bin/python3.12 /usr/local/bin/python3.12
 COPY --from=builder /usr/local/lib/python3.12 /usr/local/lib/python3.12
 COPY --from=builder /usr/local/lib/libpython3.12.so.1.0 /usr/local/lib/libpython3.12.so.1.0
 COPY --from=builder /opt/venv /opt/venv
