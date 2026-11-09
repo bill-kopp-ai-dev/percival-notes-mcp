@@ -96,8 +96,13 @@ async def run(image: str | None = None, vault_target: str = "/vault") -> None:
                 assert await call("notes_search", query="BodySearch", in_markdown=True) == ["group/one.md"]
                 assert await call("notes_search", query="BodySearch") == []
                 assert await call("notes_glob", pattern="**/*.md") == ["group/one.md", "group/two.md"]
+                assert "." not in await call("notes_glob", pattern="**")
+                response = await client.call_tool("notes_glob", {"pattern": "."})
+                assert response.isError
                 assert await call("notes_list_tags") == ["local"]
                 assert await call("notes_get_backlinks", path="group/two.md") == ["group/one.md"]
+                response = await client.call_tool("notes_get_backlinks", {"path": "../escape.md"})
+                assert response.isError
                 multiple = await call("notes_read_multiple", paths=["group/one.md", "../bad.md"])
                 assert set(multiple["notes"]) == {"group/one.md"}
                 assert "<<<BEGIN_UNTRUSTED_NOTE_CONTENT>>>" in multiple["notes"]["group/one.md"]
@@ -113,6 +118,24 @@ async def run(image: str | None = None, vault_target: str = "/vault") -> None:
                     response = await client.call_tool("notes_read", {"path": "group/outside.md"})
                     assert response.isError
                     Path(vault, "group/outside.md").unlink()
+                # A symbolic link is removed as the named entry; the note it
+                # points to survives.
+                Path(vault, "group/alias.md").symlink_to(Path(vault, "group/two.md"))
+                assert await call("notes_rm", path="group/alias.md") == "File removed: group/alias.md"
+                assert not Path(vault, "group/alias.md").exists()
+                assert Path(vault, "group/two.md").exists()
+                # A regular file without a write bit is never replaced.
+                readonly = Path(vault, "group/readonly.md")
+                readonly.write_text("original")
+                readonly.chmod(0o444)
+                response = await client.call_tool("notes_write", {
+                    "path": "group/readonly.md",
+                    "yaml_frontmatter": "---\ntype: Reference\n---",
+                    "markdown_content": "replacement"})
+                assert response.isError
+                assert readonly.read_text() == "original"
+                readonly.chmod(0o600)
+                Path(vault, "group/readonly.md").unlink()
                 await call("notes_rm", path="group/one.md")
                 await call("notes_rm", path="group/two.md")
                 await call("notes_rmdir", path="group")

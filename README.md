@@ -31,16 +31,16 @@ Like all components of `percival.OS`, this MCP server strictly follows our core 
 The `percival-notes-mcp` offers advanced knowledge management capabilities:
 
 - `notes_read(path)`: Read a single note.
-- `notes_write(path, yaml_frontmatter, markdown_content)`: Create or replace an OKF v0.2 `.md` document; creates parent directories.
-- `notes_glob(pattern)`: List files matching a pattern.
+- `notes_write(path, yaml_frontmatter, markdown_content)`: Create or replace an OKF v0.2 `.md` document; creates parent directories. New notes are created with mode `0600`; replacing an existing note preserves its permission bits, and a file with no write bit is never overwritten.
+- `notes_glob(pattern)`: List files matching a pattern. Each note is reported once, by the canonical path it resolves to; the vault root, links without an existing target and symlink loops are not listed.
 - `notes_mkdir(path)`: Create a directory.
-- `notes_rm(path)`: Remove a file.
-- `notes_rmdir(path)`: Remove a directory.
-- `notes_search(query, path=".", in_markdown=false)`: Search literal, case-insensitive terms (OR) in YAML frontmatter, optionally also in the Markdown body, using `rg`; `query` accepts a list or a comma/semicolon/newline-separated string. Returns relative paths.
-- `notes_list_tags()`: List unique lower-case tags from `tags` or `keywords` in frontmatter.
-- `notes_get_backlinks(path)`: Find incoming wiki or local Markdown links (Markdown paths resolve relative to the source note).
-- `notes_read_multiple(paths)`: Read multiple notes in a single call; returns `{notes: {path: content}, omitted: [{path, reason}]}` so unreadable, missing, oversized and outside-vault paths are explicit.
-- `notes_get_stats()`: Get repository overview (totals, top tags, etc), including unreadable-file count and bounded relative paths.
+- `notes_rm(path)`: Remove the entry named by the caller. A symbolic link is removed without touching the note or directory it points to.
+- `notes_rmdir(path)`: Remove a real, empty directory. A symbolic link is refused; use `notes_rm` to remove the link.
+- `notes_search(query, path=".", in_markdown=false)`: Search literal, case-insensitive terms (OR) in YAML frontmatter, optionally also in the Markdown body, using `rg`; `query` accepts a list or a comma/semicolon/newline-separated string. Returns relative paths. Notes that cannot be read are skipped instead of aborting the search.
+- `notes_list_tags()`: List unique lower-case tags from the `tags` and `keywords` frontmatter fields. Both fields are read and merged.
+- `notes_get_backlinks(path)`: Find incoming wiki or local Markdown links (Markdown paths resolve relative to the source note). The target is validated but need not exist.
+- `notes_read_multiple(paths)`: Read multiple notes in a single call; returns `{notes: {path: content}, omitted: [{path, reason}]}` so unreadable, missing, oversized and outside-vault paths are explicit. A file that is not valid UTF-8 is `unreadable`, not `too_large`.
+- `notes_get_stats()`: Get repository overview (totals, top tags, etc), including unreadable-file count and bounded relative paths. Each note is counted once by its canonical path.
 - `notes_get_status()`: Check server operational status and product version without disclosing the vault path.
 
 ### Resources and Prompts
@@ -88,7 +88,7 @@ reformatted on read.
 
 The operator confirmed there is no existing vault to preserve. If that changes, export/backup it before cutover. New concept writes reject legacy frontmatter lacking `type`. `notes_read` and `notes_read_multiple` still return raw legacy files within the existing untrusted-data envelope; other scans tolerate malformed frontmatter, but legacy files are not OKF-conformant. The operator confirmed Nanobot's acceptance of the required `type`, reserved-file rules, relative Markdown backlinks and the current envelope (`Source:` plus `<<<BEGIN_UNTRUSTED_NOTE_CONTENT>>>` / `<<<END_UNTRUSTED_NOTE_CONTENT>>>` rather than XML or `[SECURITY WARNING:...]`).
 
-Install [ripgrep](https://ripgrep.org/) (`rg` on `PATH`) on the host when running directly; the Docker image includes it (version 15.2.0 in the current Dockerfile). Nonempty `notes_search` queries report an explicit error when `rg` is missing. The server invokes `rg` locally using fixed-string, case-insensitive patterns over contained file descriptors, then verifies frontmatter/body matches under search limits; a query containing NUL uses the bounded Python walker because process arguments cannot contain NUL. Empty queries return no matches. Hidden/ignored notes and safe file symlinks are included; external symlinks are skipped with a sanitized warning while valid notes remain searchable. Search is **not** accent-insensitive (`cafe` does not match `café`). Oversized files are skipped. Writes use anchored directory descriptors, fsync and atomic replacement; replacement preserves existing permission bits. `notes_glob` rejects absolute patterns and `..` before enumeration. This server makes no outbound network requests for notes.
+Install [ripgrep](https://ripgrep.org/) (`rg` on `PATH`) on the host when running directly; the Docker image includes it (version 15.2.0 in the current Dockerfile). Nonempty `notes_search` queries report an explicit error when `rg` is missing. The server invokes `rg` locally using fixed-string, case-insensitive patterns over contained file descriptors, then verifies frontmatter/body matches under search limits; a query containing NUL uses the bounded Python walker because process arguments cannot contain NUL. Empty queries return no matches. Hidden/ignored notes and safe file symlinks are included; external symlinks are skipped with a sanitized warning while valid notes remain searchable. A note that cannot be read — access denied, removed while scanning, or not valid UTF-8 — is skipped with a sanitized warning rather than aborting the whole search, so an empty result can also mean "no readable match"; `notes_get_stats` is the complementary diagnostic. Search is **not** accent-insensitive (`cafe` does not match `café`). Oversized files are skipped. Writes use anchored directory descriptors, fsync and atomic replacement; replacement preserves existing permission bits, and a regular file with no write bit is refused instead of being replaced. `notes_glob` rejects absolute patterns, `..` and patterns without a path component before enumeration, and reports each existing note by its canonical path. Paths outside the vault are blocked. This server makes no outbound network requests for notes.
 
 Default limits (overridable with `PERCIVAL_NOTES_MCP_<NAME>` environment
 variables): read/write/search file size 1,000,000 bytes each (`MAX_READ_BYTES`,
@@ -110,6 +110,12 @@ current owner decision is to store backups outside the vault at
 `~/.local/share/percival-notes/backups`, retaining the newest seven daily and
 four weekly snapshots. The scripts accept `--dest` to select another protected
 location. Backups contain note contents, so keep the destination private.
+
+Notes created by the server are mode `0600` and owned by the server's user
+(UID `65532` in the container). This is the accepted access policy: a note
+written by the server is private to it, and the host operator reads it through
+the MCP tools or with root. The vault's own default ACL therefore does not
+grant the host user access to server-created notes.
 
 Create a backup (the caller must be able to read every note; use root or the
 vault owner for mode-0600 files):
