@@ -422,6 +422,8 @@ Consequências que mudam o desenho:
   O executor produz imagem sem tag e só expõe o digest de configuração
   (`imageId`), que o BuildKit trata como referência de registry. Falta, do
   host: taguear a imagem `sha256:974c5ccc…` e informar o digest do manifesto.
+  A lacuna é do executor, não do produto, e está registrada como
+  [issue 0033 do executor](../../../alternative-positronic/positronic/docs/issues/0033-executor-built-images-are-untagged-and-carry-only-the-config-digest.md).
 - `Dockerfile.offline` tinha dois defeitos reais, corrigidos: o script de
   verificação do wheelhouse não entrava no contexto e o binário `python3.12`
   não era copiado para o estágio de runtime (o entrypoint ficaria sem
