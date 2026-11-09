@@ -15,20 +15,21 @@
 #     --build-arg WHEELHOUSE_MANIFEST=vendor/wheelhouse-manifest.json \
 #     -t percival-notes-wheelhouse:offline-base .
 #
-# The digests below are the ones built and scanned on 2026-11-09:
+# The two base images are local bases of this project, built and scanned by
+# the executor and referenced by the literal `localReference` it published for
+# each producer job:
 #
-#   RUNTIME_BASE    percival-notes-runtime:offline-base@sha256:1640d59c... (owner build)
-#   WHEELHOUSE_BASE pending: see below
+#   runtime base      job bbda217d0100c6163b5fda3e0359135809e9c30ea59773504f0f056f9bc675c9
+#                     imageId sha256:acd98ac4...  configDigest sha256:5392929f...
+#                     0 findings at the [HIGH, CRITICAL] gate
+#   wheelhouse base   job fd234fc2fce4cb3d505f73a3a270e3e72bf9a25a16d5bb2bcefb44aa79a6bf00
+#                     imageId sha256:6b121102...  configDigest sha256:df0b02cf...
+#                     0 findings at the [HIGH, CRITICAL] gate
 #
-# The wheelhouse base was built and scanned by the executor on 2026-11-09 (job
-# 7c2791d4e30a21cc70ba2c02cc6bd8b7355bf3bb18aec4c38e2284f5ae2253cb, image
-# sha256:974c5ccc88bd5211e65aee85bd489e2081db44e158744e01171d483b6db3a9aa,
-# 0 findings at the blocking gate). It is still the documented placeholder
-# here for one reason: the executor's build output carries no tag, and
-# BuildKit cannot resolve a local image by its config digest, so the image has
-# to be tagged in the host store and its manifest digest recorded before this
-# variant can consume it. The placeholder is deliberately invalid so that an
-# accidental activation fails loudly instead of building something unexpected.
+# The producer jobs are declared in the project policy (`localBases`) and the
+# executor verifies identity, scan gate and platform before the build starts.
+# The literals below change whenever a base is rebuilt; they are the only
+# references the local-base mode accepts, and they are immutable.
 #
 # Switching the executor recipe to this file is an owner decision: the recipe
 # still points at the networked `Dockerfile` until that decision is taken.
@@ -36,10 +37,7 @@
 # The result is equivalent to the networked `Dockerfile`: same Debian runtime,
 # same locked Python dependencies, same non-root user, same entrypoint.
 
-ARG RUNTIME_BASE=percival-notes-runtime:offline-base@sha256:1640d59c0c98c0bdde51bdc198cff87878f3ad24ed8c9e89ffedceb05a84ff6c
-ARG WHEELHOUSE_BASE=scratch
-
-FROM ${WHEELHOUSE_BASE} AS builder
+FROM docker.io/positronic-build/e3c0ebddd73c4cdd0650740249dcca7429cf40d7bfa225cc56be1fd5d7b8b7a0:fd234fc2fce4cb3d505f73a3a270e3e72bf9a25a16d5bb2bcefb44aa79a6bf00@sha256:6b121102248681eb12761956d4efc87e5f7a3b65e951d9d1bd4e5db9a6d3a58c AS builder
 
 ENV UV_PROJECT_ENVIRONMENT=/opt/venv \
     UV_LINK_MODE=copy
@@ -57,7 +55,7 @@ RUN python3 -m venv /opt/buildvenv \
     && /opt/venv/bin/pip install --no-cache-dir --no-index \
         --find-links /wheels --find-links /wheels/project percival-notes-mcp
 
-FROM ${RUNTIME_BASE} AS runtime
+FROM docker.io/positronic-build/e3c0ebddd73c4cdd0650740249dcca7429cf40d7bfa225cc56be1fd5d7b8b7a0:bbda217d0100c6163b5fda3e0359135809e9c30ea59773504f0f056f9bc675c9@sha256:acd98ac4e2e9309526b05125ab4f73776e29e981c282315928091662cde5fd67 AS runtime
 
 ARG VERSION=0.0.0
 ARG GIT_SHA=unknown
@@ -85,7 +83,10 @@ RUN ln -sf /usr/local/lib/libpython3.12.so.1.0 /usr/local/lib/libpython3.12.so \
     && ln -sf /usr/local/bin/python3.12 /usr/local/bin/python3 \
     && ln -sf /usr/local/bin/python3.12 /usr/local/bin/python \
     && chmod 0644 /app/docker_entrypoint.py /app/LICENSE \
-    && chmod 0755 /app
+    && mkdir -p /vault /app \
+    && chmod 0755 /app \
+    && chown 65532:65532 /vault \
+    && chmod 0750 /vault
 USER 65532:65532
 WORKDIR /app
 ENTRYPOINT ["python", "/app/docker_entrypoint.py"]

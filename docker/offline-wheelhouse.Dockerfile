@@ -19,6 +19,14 @@
 # Debian packages, and the executor's blocking scan gate rejects the image:
 # the trixie base carries 51 HIGH/CRITICAL findings, the forky runtime none.
 #
+# The runtime base is a local base of this project, so it is referenced by the
+# literal `localReference` the executor published for its producer job
+# (producer job `bbda217d0100c6163b5fda3e0359135809e9c30ea59773504f0f056f9bc675c9`,
+# `imageResolution: verified`, 0 findings at the blocking gate). The literal
+# changes whenever the runtime base is rebuilt; the producer job is declared in
+# the project policy (`localBases`) and the executor verifies identity, gate
+# and platform before the build starts.
+#
 # Build with network access:
 #   docker build -f docker/offline-wheelhouse.Dockerfile \
 #     --build-arg WHEELHOUSE_MANIFEST=vendor/wheelhouse-manifest.json \
@@ -29,7 +37,7 @@
 
 FROM python:3.12-slim-trixie@sha256:2b4f19dae3a777dfc3b76730bda1e82e1f66ab2a2686fa93ca78edbfb4f04ffe AS python-runtime
 
-FROM percival-notes-runtime:offline-base@sha256:1640d59c0c98c0bdde51bdc198cff87878f3ad24ed8c9e89ffedceb05a84ff6c
+FROM docker.io/positronic-build/e3c0ebddd73c4cdd0650740249dcca7429cf40d7bfa225cc56be1fd5d7b8b7a0:bbda217d0100c6163b5fda3e0359135809e9c30ea59773504f0f056f9bc675c9@sha256:acd98ac4e2e9309526b05125ab4f73776e29e981c282315928091662cde5fd67
 
 ARG WHEELHOUSE_MANIFEST=vendor/wheelhouse-manifest.json
 LABEL org.opencontainers.image.title="Percival Notes MCP wheelhouse base" \
@@ -46,6 +54,6 @@ RUN ln -sf /usr/local/lib/libpython3.12.so.1.0 /usr/local/lib/libpython3.12.so \
     && ln -sf /usr/local/bin/python3.12 /usr/local/bin/python3 \
     && ln -sf /usr/local/bin/python3.12 /usr/local/bin/python
 
-COPY ${WHEELHOUSE_MANIFEST} /wheels/manifest.json
+COPY vendor/wheelhouse-manifest.json /wheels/manifest.json
 COPY docker/offline-wheelhouse-fetch.py /wheels/fetch.py
 RUN python3 /wheels/fetch.py

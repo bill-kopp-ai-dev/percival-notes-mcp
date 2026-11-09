@@ -119,29 +119,17 @@ def test_offline_dockerfile_has_no_network_instruction() -> None:
         )
 
 
-def test_offline_variant_is_pinned_or_explicitly_inactive() -> None:
-    """Each base is pinned by digest, or the variant stays inert."""
-    instructions = _instructions(OFFLINE_DOCKERFILE)
-    arguments = dict(re.findall(r"^ARG\s+(\w+)=(\S+)", "\n".join(instructions), re.MULTILINE))
-    bases = {
-        name: value
-        for name, value in arguments.items()
-        if name in {"RUNTIME_BASE", "WHEELHOUSE_BASE"}
-    }
-    assert set(bases) == {"RUNTIME_BASE", "WHEELHOUSE_BASE"}
-    pinned = {
-        name
-        for name, value in bases.items()
-        if re.fullmatch(r"(?:[a-z0-9][a-z0-9._/:-]*@)?sha256:[a-f0-9]{64}", value)
-    }
-    for name, value in bases.items():
-        if name in pinned:
-            continue
-        assert value == PLACEHOLDER, (
-            f"{name} must be either a digest or the documented placeholder, got {value}"
-        )
-    if len(pinned) == len(bases):
-        return
+PINNED_DIGEST = r"(?:[a-z0-9][a-z0-9._/:-]*@)?sha256:[a-f0-9]{64}"
+# The executor names every image it builds and publishes the immutable
+# `localReference` of the producer job; that literal is the only form the
+# local-base mode accepts for a base built by the executor.
+LOCAL_REFERENCE = (
+    r"docker\.io/positronic-build/[a-f0-9]{64}:[a-f0-9]{64}@sha256:[a-f0-9]{64}"
+)
+
+
+def test_offline_variant_is_not_activated() -> None:
+    """The versioned offline variant is built, not activated, until the owner says."""
     project = json.loads(
         (REPO_ROOT / ".positronic" / "project.json").read_text(encoding="utf-8")
     )
@@ -149,8 +137,32 @@ def test_offline_variant_is_pinned_or_explicitly_inactive() -> None:
         project.get("operations", {}).get("image", {}).get("dockerfile") or "Dockerfile"
     )
     assert dockerfile != "Dockerfile.offline", (
-        "the offline variant is still inactive, so the recipe must not point at it"
+        "the offline variant is built on demand, but the recipe must keep pointing "
+        "at the networked Dockerfile until the owner activates it"
     )
+
+
+def test_offline_variant_uses_literal_bases_without_expansion() -> None:
+    """The local-base mode accepts literal bases only, never ARG expansion."""
+    instructions = _instructions(OFFLINE_DOCKERFILE)
+    froms = [
+        instruction
+        for instruction in instructions
+        if instruction.upper().startswith("FROM ")
+    ]
+    assert froms, "the offline variant must declare its stages"
+    for instruction in froms:
+        reference = instruction.split()[1]
+        assert "$" not in reference, f"FROM with expansion is refused: {instruction}"
+        assert re.fullmatch(
+            rf"(?:{PINNED_DIGEST}|{LOCAL_REFERENCE})", reference
+        ), f"FROM is not a pinned digest or an executor local reference: {instruction}"
+    for instruction in instructions:
+        if not instruction.upper().startswith("COPY "):
+            continue
+        assert "$" not in instruction, (
+            f"COPY with expansion is refused in local-base mode: {instruction}"
+        )
 
 
 def test_base_images_pin_every_package_and_base() -> None:
