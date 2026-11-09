@@ -1,0 +1,76 @@
+# Offline variant of the product image.
+#
+# The executor recipe builds with `--network none`, so this variant resolves
+# every dependency from artifacts that are already local: the runtime base
+# carries the Debian runtime, the wheelhouse base carries the locked wheels.
+# No step in this file reaches the network, which is the property
+# `tests/test_offline_build_contract.py` enforces.
+#
+# The two base images are built once with network access by the operator and
+# pinned here by digest:
+#
+#   docker build -f docker/offline-runtime.Dockerfile \
+#     --build-arg DEBIAN_SNAPSHOT=20261020T000000Z -t percival-notes-runtime:offline-base .
+#   docker build -f docker/offline-wheelhouse.Dockerfile \
+#     --build-arg WHEELHOUSE_MANIFEST=vendor/wheelhouse-manifest.json \
+#     -t percival-notes-wheelhouse:offline-base .
+#
+# Replace the placeholder digests below with the digests of those two images
+# before switching the recipe to this file. The placeholder is deliberately
+# invalid so that an accidental activation fails loudly instead of building
+# something unexpected.
+#
+# The result is equivalent to the networked `Dockerfile`: same Debian runtime,
+# same locked Python dependencies, same non-root user, same entrypoint.
+
+ARG RUNTIME_BASE=scratch
+ARG WHEELHOUSE_BASE=scratch
+
+FROM ${WHEELHOUSE_BASE} AS builder
+
+ENV UV_PROJECT_ENVIRONMENT=/opt/venv \
+    UV_LINK_MODE=copy
+WORKDIR /app
+COPY pyproject.toml uv.lock notes_mcp.py README.md LICENSE ./
+COPY vendor/wheelhouse-manifest.json /wheels/manifest.json
+RUN python3 /app/scripts/offline-wheelhouse.py verify \
+        --manifest /wheels/manifest.json --wheelhouse /wheels
+RUN python3 -m venv /opt/buildvenv \
+    && /opt/buildvenv/bin/pip install --no-cache-dir --no-index --find-links /wheels \
+        --require-hashes --no-deps -r /wheels/build-requirements.txt \
+    && /opt/buildvenv/bin/pip wheel --no-deps --no-build-isolation --wheel-dir /wheels/project . \
+    && python3 -m venv /opt/venv \
+    && /opt/venv/bin/pip install --no-cache-dir --no-index \
+        --find-links /wheels --find-links /wheels/project percival-notes-mcp
+
+FROM ${RUNTIME_BASE} AS runtime
+
+ARG VERSION=0.0.0
+ARG GIT_SHA=unknown
+
+LABEL org.opencontainers.image.title="Percival Notes MCP" \
+      org.opencontainers.image.description="MCP server for OKF v0.2 markdown notes and ripgrep search" \
+      org.opencontainers.image.source="https://github.com/bill-kopp-ai-dev/percival-notes-mcp" \
+      org.opencontainers.image.documentation="https://github.com/bill-kopp-ai-dev/percival-notes-mcp/blob/main/README.md" \
+      org.opencontainers.image.licenses="MIT" \
+      org.opencontainers.image.vendor="Positronic Bean Labs" \
+      org.opencontainers.image.version="${VERSION}" \
+      org.opencontainers.image.revision="${GIT_SHA}"
+
+ENV PATH=/opt/venv/bin:$PATH \
+    HOME=/tmp \
+    PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1
+
+COPY --from=builder /usr/local/lib/python3.12 /usr/local/lib/python3.12
+COPY --from=builder /usr/local/lib/libpython3.12.so.1.0 /usr/local/lib/libpython3.12.so.1.0
+COPY --from=builder /opt/venv /opt/venv
+COPY docker_entrypoint.py LICENSE /app/
+RUN ln -sf /usr/local/lib/libpython3.12.so.1.0 /usr/local/lib/libpython3.12.so \
+    && ln -sf /usr/local/bin/python3.12 /usr/local/bin/python3 \
+    && ln -sf /usr/local/bin/python3.12 /usr/local/bin/python \
+    && chmod 0644 /app/docker_entrypoint.py /app/LICENSE \
+    && chmod 0755 /app
+USER 65532:65532
+WORKDIR /app
+ENTRYPOINT ["python", "/app/docker_entrypoint.py"]

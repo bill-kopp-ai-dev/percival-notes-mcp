@@ -339,3 +339,41 @@ qualquer revisão associada ficam para trabalho futuro, fora deste plano.
 - [x] Sincronizar as decisões de Bill, incluindo a retirada de A-003/A-006, o
   encerramento das ações locais e a exclusão de publicação do escopo, no retorno
   S2-NT do plano coordenador.
+
+## 8. Objetivo seguinte — build da imagem sem egress (2026-11-09)
+
+Decisão do owner (Bill, 2026-11-09): tornar o build da imagem independente de
+egress, porque a receita `canonical` constrói com `network: none` — que já era
+o valor efetivo durante as cinco builds que falharam em 2026-11-08. O
+`Dockerfile` atual precisa de rede em três `RUN` (pip do bootstrap, `uv sync`,
+`apt` do snapshot), e a mudança do contexto invalida a camada `COPY` do
+builder, logo o cache do host não sustenta o build atual.
+
+Instrumentado neste ciclo, sem execução de build (o agente não tem Docker):
+
+- `scripts/offline-wheelhouse.py` resolve o fecho de runtime do `uv.lock` para
+  linux/amd64 e CPython 3.12, escolhe uma wheel por pacote e confere cada
+  hash contra os locks; o fecho foi conferido de forma independente contra o
+  resolvedor do próprio `uv` (39 nomes exportados, menos `colorama` e
+  `pywin32` de Windows, são 37 — as mesmas wheels do manifesto).
+- `vendor/wheelhouse-manifest.json`: 37 wheels de runtime (11,92 MB), 1 de
+  bootstrap (`uv` 0.12.18) e 6 de backend de build; 32,37 MB no total.
+- `docker/offline-runtime.Dockerfile` e `docker/offline-wheelhouse.Dockerfile`
+  especificam as duas imagens-base que o operador constrói uma vez com rede e
+  fixa por digest.
+- `Dockerfile.offline` é a variante do produto sem rede, **inativa** enquanto
+  os digests das bases forem placeholders.
+- `tests/test_offline_build_contract.py` guarda o invariante: o manifesto
+  cobre o fecho do lock, nenhum hash é inventado, o Dockerfile offline não tem
+  instrução de rede, as bases fixam cada pacote e cada base por digest, e a
+  variante não pode ser ativada por acidente.
+- `pyproject.toml` passa a fixar o backend de build (`hatchling==1.33.0`), com
+  `uv-build-requirements.lock` gerado por `uv pip compile --generate-hashes`;
+  `uv lock --check` continua verde. Isto fecha um gap de cadeia de suprimentos
+  que afectava também o build com rede.
+
+Ação pendente do host: construir as duas bases com rede e fornecer os digests.
+O plano de trabalho, com critérios de aceitação e as decisões abertas (ativação
+do Dockerfile offline, proveniência das bases na evidência F3, custo de cache),
+está em `internal/plans/2026-11-09-offline-build-objective.md` (diretório
+interno, não distribuído).
