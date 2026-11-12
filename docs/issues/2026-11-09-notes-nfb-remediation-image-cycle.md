@@ -214,3 +214,72 @@ digest Pinado na revisão 24, agora com proveniência do commit `7c1a87e`.
 Retenção após o ciclo: o candidato D (pinado, promovido) e a imagem A
 `sha256:6c1640ce…` (rollback, ainda autorizada). Nenhuma limpeza genérica
 (`docker image prune`, `docker rmi -f`) foi executada.
+
+## Revalidação com executor corrigido e promoção do pin global — 2026-11-12
+
+Esta atualização supersede as pendências de promoção, conformidade e `dirty`
+listadas acima. O executor host atualizado foi exercitado por um build gerenciado
+novo da árvore commitada do Notes.
+
+### Build, `dirty`, scan e SBOM
+
+| Campo | Resultado |
+|---|---|
+| Job de build | `0d97905a800c5363238f87a286e50eee254569cbc42d94d1869dec8f39e1b32b` (`succeeded`) |
+| Fonte | commit `f26970d6738e84fdb3a6abeb90a22ebb86b5c5e5` |
+| `dirty` | `false` |
+| `contextSha256` | `e6b2c5655da2dd82f7031658bf52788eeef1848b8659c28fc69cd34d9932b4e1` |
+| Image ID / manifest | `sha256:0cfdc0fdd78f4c86614b80174746c936e7d470b649d7dfd8017747353059fb78` |
+| `configDigest` | `sha256:3f8a09a515b6b9b81a26a2c607e96f5b21eeda92196c06acd69b0884ddb5b6b1` |
+| `imageResolution` | `verified` |
+| Scan inicial | Trivy 0.76.1, 0 findings; DB observado como vencido em relação à data do build, então foi repetido antes da promoção |
+| Job de scan atualizado | `47ca6587647e58004e85ddd52a924c1fc3b58661f2798256b34dbe565d995640` (`succeeded`, gate `[HIGH, CRITICAL]`, 0 findings) |
+| DB Trivy da repetição | `UpdatedAt=2026-11-12 01:03:48 UTC`; `NextUpdate=2026-11-13 01:03:48 UTC` |
+| `scanSha256` atualizado | `eb0ba6897606eda5a0821adef0433c97f3ef086c7ecae45c2e692acbaa20176d` |
+| `sbomSha256` atualizado | `95d61413d36494640fe9385198d3d77a44c5ff34d38ad5507d44efbeeeb5750b` |
+| Scanner | SHA-256 `58d85fb5068b0ab9764a0d0cd8e2ad7664741054479fb1769da9b1c47c5cd0dd`, versão `0.76.1` |
+
+O primeiro build e a repetição de scan terminaram com código 0 em todas as fases.
+A correção de `dirty` publicada em `alternative-positronic` foi assim verificada
+no backend instalado: `AGENTS.md` continua fora do contexto efetivo, mas já não
+é comparado como uma diferença de contagem contra a árvore inteira.
+
+### Conformance e smoke MCP no image ID exato
+
+O `scripts/docker-ci-conformance.py` foi executado com `.venv/bin/python` contra
+o image ID acima, Docker Engine `29.9.2`, Buildx `0.39.0` e Compose `5.7.1`.
+Parâmetros: fixture F3 montada em `/vault`, `--expected-uid 65532` e os 12
+`expected-tool` da allowlist Notes. Resultado: **`stdio MCP conformance passed:
+initialize + tools/list (12 tools)`**.
+
+No mesmo image ID, um smoke MCP direto executou `initialize`, `tools/list`,
+`notes_get_status` e `notes_get_stats`. A resposta confirmou servidor
+operacional, versão `0.1.5`, 12 tools, e stats com 0 notas, 0 tags e 0 arquivos
+ilegíveis. O checksum da árvore fixture antes e depois dos testes foi idêntico:
+`7c43a43799a80e6c418b6a8728dbcc31651c7e015c33650f8f82b18998069ae0`
+(2 arquivos, 1 diretório, 0 symlinks). Nenhum conteúdo foi alterado.
+
+A bateria funcional 12/12 permanece evidência do ciclo anterior sobre o mesmo
+código Notes; este build é da revisão documental posterior `f26970d`. A nova
+identidade de imagem recebeu conformance completo e smoke seguro de status/stats.
+
+### Promoção e estado do manager
+
+`image_authorize` aceitou o digest derivado do job; revisão de autorização local
+15. O servidor global `notes` foi atualizado da revisão 25 para **26**, imagem
+`sha256:0cfdc0fdd78f4c86614b80174746c936e7d470b649d7dfd8017747353059fb78`,
+configuração `67d6ee4e-c055-4d1c-95f6-720f8a3f7437`, config revision 1. A
+allowlist de 12 tools, rede `none` e mount F3 `/vault` (`rw`) foram preservados.
+`positronic mcp server show notes` reportou `activated: true` e o image ID novo.
+O candidato D anterior (`sha256:0c8fdf75…`) permanece autorizado como retorno;
+nenhuma imagem foi removida.
+
+**Ressalva de lifecycle:** um `positronic mcp server discover notes` após a troca
+retornou `MCP cleanup-pending`. `positronic mcp server recover-runs` classificou
+o run Notes `3751b93c-2e9d-4948-bbdc-bd50c24638d2` como `ambiguous`; o container
+marcado como Positronic continua `Up`. Não foi parado nem removido, pois a
+identidade disponível não prova que seu owner morreu. O conformance e o smoke
+acima foram executados em containers efêmeros independentes e passaram; o
+estado do pin foi confirmado pelo manager. Para uma confirmação adicional do
+manager, a execução ambígua precisa ser reconciliada pelo lifecycle owner sem
+forçar remoção.

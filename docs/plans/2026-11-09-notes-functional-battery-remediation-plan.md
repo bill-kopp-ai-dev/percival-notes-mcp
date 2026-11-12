@@ -428,13 +428,13 @@ comportamento já correto.
 
 **Evidência do ciclo de imagem:**
 [docs/issues/2026-11-09-notes-nfb-remediation-image-cycle.md](../issues/2026-11-09-notes-nfb-remediation-image-cycle.md)
-— candidato final `sha256:0c8fdf75…` (job `9611052434b01420…`), construído a
-partir da árvore commitada `7c1a87e`, scan Trivy com 0 findings, pin na
-revisão 25 do server `notes`, 12/12 achados exercitados pelo MCP real sobre a
-fixture F3 restaurada ao final. O documento também registra o diagnóstico do
-flag `dirty` do executor: ele é estruturalmente `true` neste repositório
-porque `AGENTS.md` é excluído do manifesto de contexto e a comparação é de
-contagens de conjuntos diferentes — não há alteração não commitada.
+— ciclo original candidato D `sha256:0c8fdf75…` e revalidação de 2026-11-12:
+job `0d97905a800c5363238f87a286e50eee254569cbc42d94d1869dec8f39e1b32b`, fonte
+commitada `f26970d`, `dirty: false`, image ID `sha256:0cfdc0fdd78f4c86614b80174746c936e7d470b649d7dfd8017747353059fb78`. Scan/SBOM com DB Trivy atualizado: 0 findings; harness Docker stdio passou
+com 12 tools; `notes_get_status` e `notes_get_stats` passaram em smoke seguro; o
+pin global `notes` está ativo na revisão 26. A bateria 12/12 da remediação segue
+registrada para o mesmo código Notes. A seção final do documento registra a
+reconciliação `cleanup-pending`/run ambíguo sem remoção forçada.
 
 Acrescentar a cada linha fechada o identificador do teste, revisão do código
 e evidência da imagem quando aplicável. Falha/skip não vira aprovação;
