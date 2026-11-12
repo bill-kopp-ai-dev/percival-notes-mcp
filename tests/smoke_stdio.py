@@ -119,8 +119,10 @@ async def run(image: str | None = None, vault_target: str = "/vault") -> None:
                     assert response.isError
                     Path(vault, "group/outside.md").unlink()
                 # A symbolic link is removed as the named entry; the note it
-                # points to survives.
-                Path(vault, "group/alias.md").symlink_to(Path(vault, "group/two.md"))
+                # points to survives. The target is relative to the link, so it
+                # resolves the same way on the host and inside the container,
+                # where the vault is mounted at a different path.
+                Path(vault, "group/alias.md").symlink_to("two.md")
                 assert await call("notes_rm", path="group/alias.md") == "File removed: group/alias.md"
                 assert not Path(vault, "group/alias.md").exists()
                 assert Path(vault, "group/two.md").exists()
