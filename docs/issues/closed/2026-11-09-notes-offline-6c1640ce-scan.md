@@ -1,7 +1,23 @@
 # F3 — scan do candidato **offline** `percival-notes-mcp` `6c1640ce…` (2026-11-09)
 
-- **Atualizado:** 2026-11-09 UTC.
-- **Artefato escopado:** image ID (manifesto) `sha256:6c1640ce8d0c823186858dcc04b7e793a997cf301ae4680f1c00d0b30cf3a7dd`; `configDigest` `sha256:8241420ec91072d26cba849939f7b9ad7ddf3efc980fe0981336d9c262596746`; `manifestMediaType` `application/vnd.oci.image.manifest.v1+json`. É a imagem **em uso** pelo servidor Notes registrado no Positronic (`$POSITRONIC_HOME/mcp/registry.json`, `server id notes`, revisão 22).
+> **Estado: histórico — imagem superada.** Este scan vale para o image ID
+> `sha256:6c1640ce…` (variante offline), que **não** é mais o pin do servidor
+> `notes`. O pin vigente (auditoria de 2026-11-12) é a revisão **26**, image ID
+> `sha256:0cfdc0fdd78f4c86614b80174746c936e7d470b649d7dfd8017747353059fb78`,
+> `configurationId` `67d6ee4e-c055-4d1c-95f6-720f8a3f7437`, config revision 1 —
+> ver [2026-11-09-notes-nfb-remediation-image-cycle.md](2026-11-09-notes-nfb-remediation-image-cycle.md).
+>
+> **Correção de estado aplicada nesta auditoria:** a afirmação de que a
+> variante offline "continua inativa porque os digests das bases são
+> placeholders" está **obsoleta**. Desde o commit `e6a8005`, `Dockerfile.offline`
+> fixa as bases reais por `localReference` do executor (wheelhouse
+> `…:fd234fc2…@sha256:6b121102…`, runtime `…:bbda217d…@sha256:acd98ac4…`).
+> O que permanece verdade é que a variante **não está ativada na receita**:
+> `positronic mcp maintenance capabilities` reporta `dockerfile: Dockerfile`,
+> `network: default`, `localBases: []` para a receita `canonical`.
+
+- **Atualizado:** 2026-11-09 UTC; **estado reconfrontado em 2026-11-12.**
+- **Artefato escopado:** image ID (manifesto) `sha256:6c1640ce8d0c823186858dcc04b7e793a997cf301ae4680f1c00d0b30cf3a7dd`; `configDigest` `sha256:8241420ec91072d26cba849939f7b9ad7ddf3efc980fe0981336d9c262596746`; `manifestMediaType` `application/vnd.oci.image.manifest.v1+json`. Na data desta nota era a imagem **em uso** pelo servidor Notes registrado no Positronic (`$POSITRONIC_HOME/mcp/registry.json`, `server id notes`, revisão 22).
 - **Diferença para o candidato anterior:** esta imagem foi construída **sem egress** (`--network none`), a partir de duas bases locais verificadas pelo executor. O candidato anterior (`0001085057…`) foi construído com rede. O código do produto é o mesmo; as dependências Python são as mesmas versões, fixadas por hash.
 - **Origem do artefato:** revisão `e6a800555894799c5fa306f222cd060391b45fd8` (commit com a variante offline fixada pelas `localReference` do executor e com a criação de `/vault` corrigida); `contextSha256` `ab88bb56fd7487d05da0d77fdecd06ec3875852a8b76444f4084a5da6a03dc7f`.
 - **Job de build:** `06e98ea0a754d74853ecde1eee2028a251850843e37d264ca31f44991eb9e0cb` (request `f6ff3a8e8861fbeb25617a327b8cf3095a95d252c0dfc383ffbaafe2c5e9096c`), `state: succeeded`, `exitCode: 0`, fases `engine`, `build`, `identity`, `scanner-version`, `scan` e `sbom` com exit 0, `imageResolution: verified`.
@@ -41,6 +57,10 @@ A única nota escrita foi a sintética acima, removida ao final; nenhum conteúd
 ## Limites e pendências
 
 - **A variante offline continua não ativada na receita.** O `Dockerfile` da raiz (o que a receita constrói) é o do produto com rede; a variante offline é construída sob demanda e a sua ativação permanente é decisão do owner. Enquanto a receita não apontar para `Dockerfile.offline`, o build com rede continua a ser o caminho do dia a dia.
+  **Atualizado (auditoria de 2026-11-12):** confirmado — a receita `canonical`
+  reporta `dockerfile: Dockerfile`, `network: default`, `localBases: []`. A
+  justificativa escrita na época ("enquanto os digests das bases forem
+  placeholders") já não vale: os digests são reais desde `e6a8005`.
 - **As `localReference` literais mudam a cada reconstrução de base.** O procedimento está documentado nos Dockerfiles: reconstruir a base, declarar o novo job produtor em `localBases` (policy do projeto) e atualizar o literal. Sem `localBases` declaradas, o executor recusa um Dockerfile que use `positronic-build/` (`local-base-invalid`), o que impede ativação acidental.
 - **O gate de scan do builder é o host e é bloqueante** (`rejectSeverities: [HIGH, CRITICAL]` no escopo do projeto): um achado bloqueante faz o job falhar, não apenas reportar.
 - **O relatório bruto do Trivy e o SBOM ficaram no host**; o executor expõe apenas os hashes. Mesma lacuna já registrada para `0001085057…` e para a imagem Weather 0.10.0. Se a imagem for publicada, o relatório bruto deve ser arquivado em `pblabs-mcp-index/servers/notes/` e a seção do tracker atualizada com caminho e SHA-256.

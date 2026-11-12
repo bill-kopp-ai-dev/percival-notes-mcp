@@ -10,10 +10,11 @@ when the offline path drifts:
 * the base images that carry the Debian runtime and the wheels pin every
   package to an exact version and every base image by digest.
 
-The offline variant stays *inactive* until the operator builds the two base
-images and their digests replace the placeholders. While it is inactive, the
-checks assert that it cannot be activated by accident: the placeholders are
-still placeholders and the recipe still points at the networked Dockerfile.
+The offline variant is *built* but not *activated*: the two base images were
+built and their digests are pinned in the offline Dockerfile, and the variant
+image was qualified and pinned on the server once. The recipe keeps pointing at
+the networked Dockerfile until the owner activates it, and the checks assert
+that it cannot be activated by accident.
 """
 
 from __future__ import annotations
@@ -33,7 +34,6 @@ MANIFEST = REPO_ROOT / "vendor" / "wheelhouse-manifest.json"
 LOCK = REPO_ROOT / "uv.lock"
 BOOTSTRAP_LOCK = REPO_ROOT / "uv-bootstrap-requirements.lock"
 BUILD_LOCK = REPO_ROOT / "uv-build-requirements.lock"
-PLACEHOLDER = "scratch"
 
 sys.path.insert(0, str(REPO_ROOT / "scripts"))
 

@@ -70,9 +70,11 @@ broker or commands; the two owners never cross.
 - Track it with `image_job(requestId, "status")`; `image_job(requestId,
   "cancel")` stops it. The host also runs the vulnerability scan and SBOM; a
   finding at or above the recipe's `rejectSeverities` blocks the job. The
-  current recipe grant reports `scanGate: report-only`, so findings are
-  reported but do not block — treat a clean scan as required evidence, not as
-  an enforced gate, until the operator sets a blocking threshold.
+  current recipe grant reports `scanGate: [HIGH, CRITICAL]` with
+  `rejectSeverities: [HIGH, CRITICAL]`, so the scan **blocks** the job — treat
+  a clean scan as a gate, not as evidence to be requested. (An earlier revision
+  of this file described the gate as `report-only`; that changed on 2026-11-09
+  when the owner set the rejection severities in the host policy.)
 - Capture as evidence: image ID (`sha256:...`), source revision, version from
   `pyproject.toml`, scan and SBOM hashes.
 - After a lost reply, reconcile with `runtime_capabilities` and `image_job` on

@@ -1,13 +1,36 @@
 # Notes MCP — bateria funcional de testes e achados
 
+> **Estado: encerrado — 12/12 achados resolvidos em 2026-11-09.** Este documento
+> é o **relatório histórico** da bateria: descreve o código como ele estava em
+> `0a44d1c` e **não** descreve o estado atual do produto. O que está em vigor:
+>
+> - Correções: `7c1a87e` (`notes_mcp.py`, +351/−… linhas) e 40 regressões
+>   permanentes em `tests/test_functional_battery.py`.
+> - F-04 permanece **aceito por decisão** do owner (D-01: nota nova nasce
+>   `0600`, sem modo de herança) — não é um defeito aberto.
+> - Plano de remediação:
+>   [docs/plans/closed/2026-11-09-notes-functional-battery-remediation-plan.md](../../plans/closed/2026-11-09-notes-functional-battery-remediation-plan.md).
+> - Evidência de imagem:
+>   [docs/issues/closed/2026-11-09-notes-nfb-remediation-image-cycle.md](2026-11-09-notes-nfb-remediation-image-cycle.md).
+>
+> Os números de linha citados abaixo (`notes_mcp.py:658`, `:450`, `:545`, …)
+> valem para a árvore `0a44d1c` e **não** para o arquivo atual, que foi
+> reescrito. Nenhum dos defeitos descritos abaixo existe no código vigente.
+
 - **Data:** 2026-11-09 (UTC).
 - **Escopo:** as 12 tools públicas de `percival-notes-mcp` 0.1.5, exercitadas
-  contra o binário real em modo stdio e contra a **imagem pinada em uso**
-  (`sha256:6c1640ce…`, server id `notes`, revisão 22 do registry).
+  contra o binário real em modo stdio e contra a **imagem pinada em uso na
+  data da bateria** (`sha256:6c1640ce…`, server id `notes`, revisão 22 do
+  registry).
 - **Árvore:** `percival-notes-mcp` em `0a44d1c` (working tree limpa).
 - **Baseline antes da bateria:** `.venv/bin/python -m pytest -q` → **71 passed,
   7 skipped** (os skips são os casos que dependem de Docker/imagem local).
   Nenhum teste foi alterado; a suíte continua verde no fim da bateria.
+  **Nota de ambiente (auditoria de 2026-11-12):** essa contagem foi medida num
+  host **sem o binário `docker`** no `PATH`, o que fazia o módulo inteiro
+  `tests/test_vault_backup_restore.py` ser ignorado (4 skips adicionais). Com o
+  binário presente, a mesma árvore `0a44d1c` produz **74 passed, 4 skipped**.
+  O número de skips é, portanto, dependente do ambiente e não da árvore.
 - **Harness:** `/home/bill/.positronic/runtime/tmp/opencode/` —
   `notes_battery.py` (48 probes), `notes_battery2.py` (48 probes),
   `confirm_findings.py`, `fm_probe.py`, mais um roteiro de revalidação
@@ -623,4 +646,18 @@ resolução de path é idêntico e está demonstrado por F-12 na imagem.
 - Não foi exercitada a interação com Nanobot (o consumidor do contrato).
 - A suíte existente (`71 passed, 7 skipped`) não cobre nenhum dos 12 achados
   acima — nenhum teste novo foi adicionado nesta etapa; a correção e a
-  cobertura de regressão ficam a cargo do ciclo de remediação.
+  cobertura de regressão ficaram a cargo do ciclo de remediação.
+  **Encerrado:** a remediação (`7c1a87e`) adicionou 40 regressões em
+  `tests/test_functional_battery.py`, 28 delas discriminando a causa esperada
+  contra o código anterior. A suíte atual mede **114 passed, 4 skipped**.
+
+### Estado vigente verificado na auditoria de 2026-11-12
+
+| Item | Estado verificado |
+|---|---|
+| Achados F-01..F-12 | 11 corrigidos, F-04 aceito por decisão (D-01) |
+| Suíte canônica | `114 passed, 4 skipped` (skips: 3 × `test_docker_lifecycle.py` e 1 × `test_vault_backup_restore.py`, todos dependentes de daemon/imagem local) |
+| Smoke stdio local | passou (`12 tools, resource, prompts, OKF read/write, rg, envelope, traversal, missing rg`) |
+| Smoke stdio contra a imagem pinada | passou contra `sha256:0cfdc0fd…` após a correção da fixture descrita em [2026-11-09-notes-nfb-remediation-image-cycle.md](2026-11-09-notes-nfb-remediation-image-cycle.md) |
+| Pin vigente | server `notes`, revisão 26, image ID `sha256:0cfdc0fd78f4c86614b80174746c936e7d470b649d7dfd8017747353059fb78`, `configurationId` `67d6ee4e-c055-4d1c-95f6-720f8a3f7437`, config revision 1 |
+| MCP vivo | `notes_get_status` → versão `0.1.5`; `notes_get_stats` → 0 notas, 0 tags, 0 ilegíveis |

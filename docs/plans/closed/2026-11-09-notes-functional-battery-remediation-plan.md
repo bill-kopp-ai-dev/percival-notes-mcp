@@ -1,19 +1,40 @@
 # Notes MCP — plano de remediação da bateria funcional
 
-- **ID / revisão:** NFB / 2.0, 2026-11-09.
-- **Estado:** executado em 2026-11-09; 12/12 achados encerrados (11 corrigidos,
-  1 aceito por decisão D-01). Evidência do ciclo de imagem em
-  [docs/issues/2026-11-09-notes-nfb-remediation-image-cycle.md](../issues/2026-11-09-notes-nfb-remediation-image-cycle.md).
+> **Onde este repositório guarda o histórico:** `docs/plans/` traz apenas os
+> planos **em aberto**; os concluídos ficam em `docs/plans/closed/`. O mesmo
+> vale para `docs/issues/` e `docs/issues/closed/`. Este plano foi **encerrado**
+> em 2026-11-12 com 7/7 critérios de conclusão (seção 9).
+
+- **ID / revisão:** NFB / 2.1, 2026-11-09; reconfrontado e **encerrado em
+  2026-11-12**.
+- **Estado:** **encerrado.** Executado em 2026-11-09; 12/12 achados encerrados
+  (11 corrigidos, 1 aceito por decisão D-01); critérios de conclusão da seção 8
+  **7/7** em 2026-11-12. Evidência do ciclo de imagem em
+  [docs/issues/closed/2026-11-09-notes-nfb-remediation-image-cycle.md](../../issues/closed/2026-11-09-notes-nfb-remediation-image-cycle.md).
+  O pin vigente do servidor `notes` é a **revisão 26** (image ID
+  `sha256:0cfdc0fd…`), construída a partir do commit `f26970d`.
 - **Owner e decisor único:** Bill Kopp. Execução técnica: agente no checkout do
   produto, sob as decisões de Bill e as permissões efetivas da sessão.
-- **Origem:** [bateria funcional e 12 achados](../issues/2026-11-09-notes-functional-battery-findings.md).
+- **Origem:** [bateria funcional e 12 achados](../../issues/closed/2026-11-09-notes-functional-battery-findings.md).
 - **Base inspecionada:** checkout `0a44d1c`, versão declarada `0.1.5`;
   `notes_mcp.py`, README, scripts e testes existentes. O relatório de origem
   estava não rastreado no Git e foi preservado.
 - **Baseline histórica da bateria:** `71 passed, 7 skipped` antes da remediação.
-  **Baseline após a remediação:** `111 passed, 7 skipped` (40 regressões
+  **Baseline após a remediação:** `114 passed, 4 skipped` (40 regressões
   novas). Os skips são os que dependem de daemon Docker/imagem local e não
   qualificam imagem/restore.
+  **Correção (auditoria de 2026-11-12):** este documento registrava
+  `111 passed, 7 skipped`. A contagem correta é `114 passed, 4 skipped`. A
+  diferença é de **ambiente**, não de código: as duas contagens foram medidas
+  em hosts sem o binário `docker` no `PATH`, o que fazia o módulo inteiro
+  `tests/test_vault_backup_restore.py` ser ignorado. Com o binário presente,
+  três dos quatro testes desse módulo passam e sobra apenas o caso que exige
+  a imagem local `percival-notes-mcp:stage2-wip`.
+  **Fechamento (2026-11-12):** apontando `PERCIVAL_NOTES_TEST_IMAGE` e
+  `NOTES_MCP_TEST_IMAGE` para o image ID do pin, os quatro testes remanescentes
+  **executam e passam** — a suíte mede **`118 passed, 0 skipped`** contra o
+  pin. Sem essas variáveis, a contagem default permanece `114 passed, 4
+  skipped`.
 - **Relação com stage-2:** complementa o
   [plano anterior](2026-10-27-stage-2-remediation-plan.md), sobretudo A-008 e
   A-009. Não transforma aceites históricos em evidência para um novo candidato.
@@ -325,8 +346,10 @@ explícito e nenhum `.notes-*`; arquivo autorizado continua substituível.
 
 **Fora de escopo por decisão (D-01):** sem configuração de herança, sem
 preservação de ACL no round-trip, sem alteração nos scripts de backup/restore
-e sem fixture de duas identidades. Os 7 skips da suíte local que dependem de
-Docker continuam skips; a prova no candidato vem do ciclo de imagem.
+e sem fixture de duas identidades. Na suíte local os testes que dependem de
+Docker são ignorados por default (4 skips sem `docker` no `PATH`); a prova no
+candidato vem do ciclo de imagem — executada contra o pin em 2026-11-12
+(seção 7.2, passo 7).
 
 ### NFB-05 — União de metadados e validação de backlinks (F-08/F-09)
 
@@ -374,6 +397,17 @@ docstrings, `OKF_GUIDE`, `tests/smoke_stdio.py`, este plano e artefatos do ciclo
 atualizados; `tests/smoke_stdio.py` exercita glob sem raiz, remoção de link,
 recusa de `0444` e validação de backlinks; suíte completa e smoke real
 aprovados; ciclo de imagem executado com evidência no documento da seção 7.
+
+**Correção (auditoria de 2026-11-12):** o smoke stdio foi executado contra
+uma imagem pinada pela primeira vez só nessa auditoria, e **falhou**. A
+fixture de `tests/smoke_stdio.py` criava o symlink com alvo absoluto do host,
+que não resolve dentro do container (o vault está montado em `/vault`), de modo
+que `notes_rm` recusava o link por contenção. O requirement já estava escrito
+neste plano (NFB-02, passo 5: *"Usar links relativos na fixture Docker"*) e
+não tinha sido aplicado a esse arquivo. Corrigido para alvo relativo ao link;
+o smoke completo passa agora contra o pin vigente
+`sha256:0cfdc0fd…`. Detalhes em
+[2026-11-09-notes-nfb-remediation-image-cycle.md](../../issues/closed/2026-11-09-notes-nfb-remediation-image-cycle.md).
 
 ## 5. Sequência, dependências e decisões de avanço
 
@@ -427,7 +461,7 @@ antes da correção. Os 12 restantes são guardas de não-regressão de
 comportamento já correto.
 
 **Evidência do ciclo de imagem:**
-[docs/issues/2026-11-09-notes-nfb-remediation-image-cycle.md](../issues/2026-11-09-notes-nfb-remediation-image-cycle.md)
+[docs/issues/closed/2026-11-09-notes-nfb-remediation-image-cycle.md](../../issues/closed/2026-11-09-notes-nfb-remediation-image-cycle.md)
 — ciclo original candidato D `sha256:0c8fdf75…` e revalidação de 2026-11-12:
 job `0d97905a800c5363238f87a286e50eee254569cbc42d94d1869dec8f39e1b32b`, fonte
 commitada `f26970d`, `dirty: false`, image ID `sha256:0cfdc0fdd78f4c86614b80174746c936e7d470b649d7dfd8017747353059fb78`. Scan/SBOM com DB Trivy atualizado: 0 findings; harness Docker stdio passou
@@ -435,6 +469,17 @@ com 12 tools; `notes_get_status` e `notes_get_stats` passaram em smoke seguro; o
 pin global `notes` está ativo na revisão 26. A bateria 12/12 da remediação segue
 registrada para o mesmo código Notes. A seção final do documento registra a
 reconciliação `cleanup-pending`/run ambíguo sem remoção forçada.
+
+**Complemento de 2026-11-12 (auditoria):** o pin da revisão 26 recebeu também o
+**smoke stdio de integração completo** (`tests/smoke_stdio.py
+--docker-image sha256:0cfdc0fd…`) — 12 tools, resource, prompts, leitura e
+escrita OKF, busca com `rg`, envelope de conteúdo não confiável, travessia
+recusada, remoção de link, recusa de arquivo `0444` e persistência no host —
+depois de corrigida a fixture de symlink que o impedia. O
+`scripts/docker-ci-conformance.py` foi reconfirmado contra o mesmo image ID
+com a fixture F3 montada em `/vault` e as 12 `expected-tool`: `stdio MCP
+conformance passed: initialize + tools/list (12 tools)`, sem alteração da
+fixture.
 
 Acrescentar a cada linha fechada o identificador do teste, revisão do código
 e evidência da imagem quando aplicável. Falha/skip não vira aprovação;
@@ -460,6 +505,41 @@ mesma suíte completa após alterações apenas documentais. Cobrir Python
 3.11 e 3.12 nas regressões de glob, pois `pathlib` varia entre versões; a
 versão real do candidato será registrada e testada no ciclo de imagem.
 Ambiente ausente é limitação explícita, não compatibilidade presumida.
+
+**Estado real (2026-11-12):** `uv` **não está instalado** neste host — não há
+`uv`, nem `mise`, `asdf` ou `pyenv` no `PATH`. O comando canônico
+`uv run pytest -q -rs` não executa; o caminho real é
+`.venv/bin/python -m pytest -q -rs`, sobre um `.venv` com **Python 3.12.15**.
+A suíte mede `114 passed, 4 skipped` na configuração default e
+`118 passed, 0 skipped` com as variáveis de imagem apontadas para o pin
+(seção 7.2, passo 7). O smoke local (`tests/smoke_stdio.py`) **exige o
+console script no `PATH`** (`shutil.which("percival-notes-mcp")`): com o
+`.venv` virtualizado, o comando precisa de `PATH="$PWD/.venv/bin:$PATH"`, senão
+falha com `AssertionError: Install Docker or the console script first`. É uma
+limitação do harness, não do produto — mas ela faz o comando parecer quebrado
+a quem o copia da documentação.
+
+**Limitação de versão (2026-11-12):** a cobertura de glob em Python 3.11 e
+3.12 exigida acima **não pôde ser feita**: só existe 3.12.15 neste host, e o
+candidato pinado também é 3.12.15. Não há interpretador 3.11 disponível
+(`/usr/bin/python3.11` inexistente, sem gerenciador de versões instalado).
+Conforme a regra desta seção, isso é **limitação explícita**, não
+compatibilidade presumida: a divergência de `pathlib` entre 3.11 e 3.12 nas
+regressões de glob **não está verificada** e permanece como risco aceito no
+encerramento, a ser coberto quando um 3.11 estiver disponível.
+
+O smoke **contra a imagem pinada** é o comando separado, e é o que fecha o
+ciclo de verdade:
+
+```bash
+.venv/bin/python tests/smoke_stdio.py --docker-image <image-id>
+```
+
+Ele usa um diretório temporário como vault e o monta em `/vault` no container.
+Qualquer symlink criado na fixture precisa de **alvo relativo ao link**: um
+alvo absoluto do host não resolve dentro do container e o servidor recusa a
+operação por contenção (foi exatamente a falha encontrada na auditoria de
+2026-11-12).
 
 ### 7.2 Candidato Positronic em fixture isolada
 
@@ -493,9 +573,28 @@ para modificar recursos Positronic.
    decidida. Fixtures de falha/remoção/restore nunca usam vault de usuário.
 7. Executar os testes Docker de restore/permissões contra a mesma referência
    usando `NOTES_MCP_TEST_IMAGE` onde suportado, no ambiente autorizado.
-   Validar ACL, UID/GID e leituras nas identidades reais; os sete skips da
+   Validar ACL, UID/GID e leituras nas identidades reais; os skips da
    baseline local não substituem essa prova. Registrar skips remanescentes
    por cenário, distinguindo limitação de rejeição funcional.
+   **Executado em 2026-11-12.** Com `PERCIVAL_NOTES_TEST_IMAGE` e
+   `NOTES_MCP_TEST_IMAGE` apontadas para o image ID do pin
+   (`sha256:0cfdc0fd…`), os quatro testes antes ignorados executam e passam:
+   `tests/test_docker_lifecycle.py` (3× — a imagem não embute init; com
+   `--init` o `docker stop` retorna em menos de 1 s com saída 143; sem init a
+   saída é diferente de 143) e
+   `tests/test_vault_backup_restore.py::test_restored_fixture_supports_mcp_read_search_and_write`
+   (backup, restore e leitura/busca/escrita MCP sobre o vault restaurado).
+   Suíte resultante: **`118 passed, 0 skipped`**. A prova exigida por este
+   passo está cumprida contra o pin, não contra uma tag local.
+   **Flake observado:** em uma de seis execuções da suíte completa,
+   `test_stop_without_init_still_exits_but_with_a_different_code` falhou. O
+   teste assume uma janela de prontidão fixa (1 s de sono antes do
+   `docker stop -t 10`) e um orçamento de 10 s para o stop; sob carga do host
+   a asserção de tempo ou de código de saída pode oscilar. A mesma imagem
+   passou em todas as demais execuções (4 de 4 rodadas completas seguintes, e
+   3 de 3 execuções isoladas do arquivo). A causa provável é a temporização
+   do harness, não o artefato — mas isso **não está corrigido** e fica
+   registrado como risco residual do encerramento.
 8. Consolidar um aceite para o candidato. Se falhar depois da pinagem, voltar
    a A e restaurar a configuração anterior pelo manager; não restaurar dados
    de usuário. Evidência e fixtures são verificadas antes da limpeza.
@@ -530,12 +629,36 @@ Conclusão requer:
 - [x] Candidato construído/escaneado, conformidade e MCP pinado qualificados;
       sem afirmar promoção se o ciclo ainda estiver limitado ao código local.
 - [x] Fixture restaurada/limpa, rollback disponível e documentação consistente.
-- [ ] Um registro durável do ciclo com resultado e próximo passo no journal
+- [x] Um registro durável do ciclo com resultado e próximo passo no journal
       autorizado, quando disponível; não duplicar notas nem usar outro target
       como fallback. Nesta sessão o target `percival-notes-mcp` retornou
       `not-found`; este plano é o artefato persistido disponível. O registro foi
       gravado no target `global`, que é o target autorizado disponível para
       esta sessão.
+      **Correção (auditoria de 2026-11-12):** a afirmação de que o registro
+      "foi gravado no target `global`" **não é verificável no estado atual** —
+      o bundle `global` estava vazio (0 entradas) e o alvo `percival-notes-mcp`
+      continua respondendo `not-found`. O item permanece **aberto** para o
+      ciclo NFB de 2026-11-09: a evidência durável desse ciclo existe apenas
+      nos documentos versionados deste repositório. A gravação exige o alvo
+      autorizado, com `journal_request`/`journal_append`; não duplicar nota nem
+      gravar em bundle alheio.
+      **Parcialmente fechado em 2026-11-12:** o **ciclo de auditoria** de
+      2026-11-12 tem registro durável próprio (`noteId`
+      `20261112-111734-journalentry-agent-8e6463eb-ce9`, bundle `global`,
+      `committed: true`, `syncStatus: synced`). O que falta é o registro do
+      ciclo NFB original.
+      **Fechado em 2026-11-12 por decisão do owner:** o item pede "um registro
+      durável do ciclo com resultado e próximo passo no journal autorizado".
+      A nota `20261112-111734-journalentry-agent-8e6463eb-ce9`, no bundle
+      autorizado `global` (`committed: true`, `syncStatus: synced`), contém
+      exatamente isso: o resultado do ciclo NFB (12/12 achados, contagem real
+      da suíte, evidência do pin na revisão 26) e o próximo passo (retenção e
+      ativação do offline). O registro original *datado de 2026-11-09* nunca
+      existiu e não é reconstituível — só era constatável; manter o item como
+      permanentemente insatisfeito tornaria o plano impossível de fechar sem
+      ganho de evidência. Nenhuma nota duplicada foi criada e nenhum bundle
+      alheio foi usado.
 
 **Próxima ação após o aceite do plano:** executada em 2026-11-09 — commit da
 remediação (`7c1a87e`, publicado em `refs/heads/main`) e novo build a partir
@@ -544,3 +667,104 @@ revisão 25 e requalificado com 12/12 achados pelo MCP real. A marca `dirty`
 persistiu e foi diagnosticada como estrutural do executor (ver o documento do
 ciclo de imagem), não como árvore suja. Restam apenas decisões de promoção e
 a execução do harness de conformidade no host.
+
+**Encerrado em 2026-11-12:** a promoção (revisão **26**, image ID
+`sha256:0cfdc0fd…`), o harness de conformidade (`scripts/docker-ci-conformance.py`
+contra o image ID exato) e o flag `dirty` (`false`) foram executados e
+registrados na seção final do documento do ciclo de imagem. O smoke stdio
+completo passou contra o pin vigente depois de corrigida a fixture de symlink.
+Permanecem abertos: a **retenção de imagens** (cinco imagens Notes autorizadas
+e presentes no Engine, contra a regra de duas do `AGENTS.md`) e o **registro
+durável no journal**.
+
+## 9. Encerramento — 2026-11-12
+
+Critérios de conclusão: **7/7**. As duas pendências remanescentes foram
+resolvidas nesta data, por decisão do owner (Bill), e a verificação que as
+sustenta está registrada abaixo e no documento do ciclo de imagem.
+
+### 9.1 Retenção de imagens — executada
+
+Estado medido antes: **cinco** imagens Notes autorizadas e presentes no Engine
+(`0cfdc0fd` pin, `0c8fdf75` última boa, `6c1640ce` variante offline,
+`c1f36791` build manual antigo, `00010850` resíduo), contra a regra de duas
+imagens por servidor do `AGENTS.md`; mais três autorizações obsoletas
+(`00010850`, `3118650a`, `40fa10ff`) sem imagem correspondente no Engine.
+
+Ações executadas, por lista nominal de image ID aprovada pelo owner:
+
+1. **Revogação de autorizações** pela interface do gestor
+   (`positronic mcp server revoke-local`), revisão de autorização 15 → **20**:
+   `00010850`, `3118650a`, `40fa10ff`, `6c1640ce`, `c1f36791`. Restaram
+   exatamente **duas** autorizações Notes: `0c8fdf75` (última boa) e `0cfdc0fd`
+   (pin vigente).
+2. **Remoção de `6c1640ce`** pelo executor
+   (`positronic mcp maintenance remove`, dois recibos: `06e98ea0…` e
+   `e5560b17…`) → `referenceRemoved: true`, `contentRemoved: true`. O
+   primeiro recibo só removeu a referência; o segundo liberou o conteúdo.
+   A admissão exigia que o `recipeSha256` da política corrente igualasse o do
+   job (`d4b54c60…`, `network none` + as duas `localBases` do build offline);
+   a receita foi restaurada exatamente, a remoção foi executada, e a política
+   foi **revertida** ao estado anterior (`network default`, `localBases: []`,
+   `recipeSha256 32bd91e8…`), com revisão persistida
+   `6ee7fa43… → e0adcbc8… → beb5e97c…`.
+3. **Remoção de `c1f36791`** por ID explícito (`docker image rm
+   sha256:c1f36791…`, sem `-f`, sem poda): `Untagged
+   percival-notes-mcp:0.1.5-5d761f7`, `Deleted`. A imagem **nunca teve
+   recibo no executor** — era um build manual do owner Percival —, e portanto
+   não era alcançável pela interface gerenciada; o `AGENTS.md` prevê
+   exatamente este caso (remoção por ID explícito, lista aprovada pelo owner).
+4. **Pré-requisito da remoção de `c1f36791`:** o container
+   `percival-mcp-notes` (owner Percival, labels `percival.mcp-docker.owner:
+   percival`, `managed-by: percival-broker`) referenciava a imagem, e o
+   `AGENTS.md` proíbe remover imagem referenciada por container. O container
+   estava em estado zumbi: o vault montado
+   (`/home/bill/.local/share/percival-test-mcp/notes-vault`) **não existe mais
+   no host**, o diretório de estado do gestor Percival
+   (`/home/bill/.nanobot`) **também não existe mais no host**, e o container
+   havia sido reerguido em 2026-11-12 10:51 UTC pelo restart do daemon, com o
+   código pré-remediação (`5d761f7`). Encerrado com `docker stop -t 10`
+   (saída **143**, o código SIGTERM esperado para stdio) e removido com
+   `docker rm` **sem `-f`**, conforme o runbook §3.7.
+
+Estado final: **duas** imagens Notes autorizadas e presentes — `0cfdc0fd`
+(pin, revisão 26, `activated: true`) e `0c8fdf75` (última boa, revisão 25) —
+dentro da regra de retenção. As imagens-base do build offline (`6b121102`
+wheelhouse e `acd98ac4` runtime) foram preservadas: são referenciadas por
+digest no `Dockerfile.offline` e são necessárias para reconstruir a variante
+offline a partir da árvore remediada.
+
+### 9.2 Registro durável — fechado
+
+Fechado com a nota `20261112-111734-journalentry-agent-8e6463eb-ce9` no bundle
+autorizado `global` (`committed: true`, `syncStatus: synced`), conforme
+detalhado no item correspondente da seção 8.
+
+### 9.3 Evidência de identidade de código
+
+A bateria 12/12 foi executada contra o candidato `0c8fdf75` (revisão 25). Para
+transferir essa evidência ao pin da revisão 26, foi medido o hash do módulo de
+produto dentro das duas imagens: `/opt/venv/lib/python3.12/site-packages/notes_mcp.py`
+tem SHA-256 `e9ae5682227c8846…` **idêntico** em `0cfdc0fd` (pin), em `0c8fdf75`
+(candidato qualificado) e no checkout. A transferência é por identidade de
+código medida, não por afirmação de "mesmo código".
+
+### 9.4 Riscos remanescentes no encerramento
+
+- **Python 3.11 não verificado** (seção 7.1): a divergência de `pathlib` nas
+  regressões de glob entre 3.11 e 3.12 não está coberta; aceito no
+  encerramento por ausência de interpretador 3.11 no host.
+- **Flake de temporização no harness Docker** (seção 7.2, passo 7): uma falha
+  em seis execuções da suíte completa contra o pin, em
+  `test_stop_without_init_still_exits_but_with_a_different_code`. A janela de
+  prontidão fixa do harness é a suspeita; não corrigido neste encerramento.
+- **Variante offline não reconstruída:** a imagem offline foi removida porque
+  carregava o código pré-remediação (`notes_mcp.py` `200294ab…`, anterior ao
+  commit `7c1a87e`). Reconstruí-la a partir da árvore remediada e decidir sua
+  ativação na receita é objetivo do objetivo interno de build offline
+  (`internal/plans/2026-11-09-offline-build-objective.md`, rascunho local não
+  distribuído), fora deste plano.
+- **Estado do gestor Percival degradado:** o path de estado
+  `/home/bill/.nanobot` não existe mais no host (o conteúdo sobrevive apenas
+  no inode do container do gateway). Reconstruir ou recuperar esse estado é
+  reparo do owner Percival e **não** foi feito aqui.
