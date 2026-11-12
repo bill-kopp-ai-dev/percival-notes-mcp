@@ -53,10 +53,11 @@ broker or commands; the two owners never cross.
   `positronic mcp maintenance capabilities` (host build grants).
 - Building requires a host-granted recipe for this project (`project:
   percival-notes-mcp`, `recipe: canonical`, `serverId: notes`, `agentRoot:
-  /home/bill/Projects/percival-notes-mcp`, `dockerfile: Dockerfile`,
-  `versionFile: pyproject.toml`). The registered project name is
-  `percival-notes-mcp`; `notes` is the MCP `serverId`, not the build project.
-  If no recipe for `percival-notes-mcp` is listed, the submission is
+  /home/bill/Projects/percival-notes-mcp`, `dockerfile: Dockerfile`). The
+  registered project name is `percival-notes-mcp`; `notes` is the MCP
+  `serverId`, not the build project. The product version is read from
+  `pyproject.toml` by the agent for the evidence record; it is not a recipe
+  field. If no recipe for `percival-notes-mcp` is listed, the submission is
   `policy-denied`: ask the operator to add it to the host policy file
   (`POSITRONIC_EXECUTOR_MAINTENANCE_POLICY_FILE`). The agent never self-grants
   a recipe and never builds through another project's recipe.
